@@ -28,7 +28,7 @@ class ClaudeClientConfig:
     
     cwd: str
     settings: str
-    system_prompt: str = "You are Claude"
+    system_prompt: str = "You are a helpful coding assistant"
 class ClaudeClient:
     """Wrapper class for ClaudeSDKClient with simplified interface.
 
@@ -61,9 +61,6 @@ class ClaudeClient:
         """Enter async context manager, connecting to Claude."""
         self._client = ClaudeSDKClient(self._options)
         await self._client.connect()
-        return self
-        """Enter async context manager, connecting to Claude."""
-        self._client = ClaudeSDKClient(self._options)
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:  # type: ignore

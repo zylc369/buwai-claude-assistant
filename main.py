@@ -246,6 +246,7 @@ async def repl_loop(cwd: str, settings: str, stream: bool = True, verbose: bool 
                     if stream:
                         async for chunk in await client.receive_response():
                             process_message(chunk, stream=True, verbose=verbose)
+                        print()  # New line after streaming output
                     else:
                         chunks = []
                         async for chunk in await client.receive_response():

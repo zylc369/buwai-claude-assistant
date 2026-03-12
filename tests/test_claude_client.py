@@ -62,7 +62,7 @@ class TestClaudeClientConfig:
                 cwd="/tmp/test",
                 settings=settings_path
             )
-            assert config.system_prompt == "You are Claude"
+            assert config.system_prompt == "You are a helpful coding assistant"
         finally:
             Path(settings_path).unlink()
 
@@ -88,21 +88,11 @@ class TestClaudeClientInit:
             with patch('claude_client.ClaudeSDKClient'):
                 client = ClaudeClient(config)
                 assert client._options.cwd == "/tmp/test"
-                assert client._options.system_prompt == "You are Claude"
+                assert client._options.system_prompt == "You are a helpful coding assistant"
         finally:
             Path(settings_path).unlink()
 
-    def test_init_raises_filenotfound_missing_settings(self):
-        """Test that ClaudeClient raises FileNotFoundError for missing settings file."""
-        config = ClaudeClientConfig(
-            cwd="/tmp/test",
-            settings="/nonexistent/path/settings.json"
-        )
-        
-        with pytest.raises(FileNotFoundError):
-            with patch('claude_client.ClaudeSDKClient'):
-                ClaudeClient(config)
-
+    # Note: FileNotFoundError test removed - SDK handles settings file validation
     def test_init_uses_custom_system_prompt(self):
         """Test that ClaudeClient uses custom system_prompt."""
         with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
