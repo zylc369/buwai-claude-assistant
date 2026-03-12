@@ -45,9 +45,6 @@ class ClaudeClient:
         Raises:
             FileNotFoundError: If the settings file does not exist.
         """
-        # Read settings.json from the provided path
-        with open(config.settings, 'r') as f:
-            settings_data = json.load(f)
         
         print(f"[ClaudeClient] Loaded Claude settings from {config.settings}", file=sys.stderr)
         
@@ -56,16 +53,15 @@ class ClaudeClient:
             system_prompt=config.system_prompt,
             cwd=config.cwd,
             permission_mode="acceptEdits",
+            settings=config.settings
         )
         
         self._options = options
-        
-        # Apply custom settings if available (e.g., API key override)
-        if settings_data:
-            # Merge settings_data into ClaudeAgentOptions if supported
-            # Note: SDK may support settings in different ways
-            print(f"[ClaudeClient] Applying settings: {settings_data.get('api_key', 'N/A')} - Custom settings applied", file=sys.stderr)
     async def __aenter__(self) -> "ClaudeClient":
+        """Enter async context manager, connecting to Claude."""
+        self._client = ClaudeSDKClient(self._options)
+        await self._client.connect()
+        return self
         """Enter async context manager, connecting to Claude."""
         self._client = ClaudeSDKClient(self._options)
         return self
