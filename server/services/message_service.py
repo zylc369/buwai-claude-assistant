@@ -115,6 +115,28 @@ class MessageService:
             limit=limit
         )
     
+    async def list_messages_after_id(
+        self,
+        session_unique_id: str,
+        last_message_id: int,
+        limit: int = 100
+    ) -> List[Message]:
+        """List messages with id greater than last_message_id for incremental fetching.
+        
+        Args:
+            session_unique_id: The unique identifier of the session.
+            last_message_id: Only return messages with id > this value.
+            limit: Maximum number of results (default: 100).
+            
+        Returns:
+            List of messages with id > last_message_id, ordered by creation time.
+        """
+        return await self.message_repo.get_messages_after_id(
+            session_unique_id=session_unique_id,
+            last_message_id=last_message_id,
+            limit=limit
+        )
+    
     def _extract_response_text(self, chunks: List[Any]) -> str:
         """Extract text content from AI response chunks.
         

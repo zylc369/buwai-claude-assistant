@@ -329,6 +329,7 @@ class TestSSEServiceWithDatabase:
         
         session = Session(
             session_unique_id="sess_sse_001",
+            external_session_id="external-sess-sse-001",
             project_unique_id="proj_sse_001",
             workspace_unique_id="ws_sse_001",
             directory="/test/path",

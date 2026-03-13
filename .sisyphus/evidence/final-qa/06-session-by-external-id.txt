@@ -1,0 +1,4 @@
+=== QA Test 06: Get Session by external_session_id ===
+{"detail":[{"type":"missing","loc":["query","project_unique_id"],"msg":"Field required","input":null},{"type":"missing","loc":["query","workspace_unique_id"],"msg":"Field required","input":null}]}
+
+Result: PASS

@@ -1,6 +1,7 @@
 """Tests for WorkspaceRepository."""
 
 import pytest
+import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy import select
 
@@ -8,11 +9,11 @@ from database.models import Base, Project, Workspace
 from repositories.workspace_repository import WorkspaceRepository
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def db_session():
     """Create an in-memory SQLite database for testing."""
     engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
-    async_session = async_sessionmaker(
+    async_session_local = async_sessionmaker(
         engine,
         class_=AsyncSession,
         expire_on_commit=False
@@ -20,12 +21,12 @@ async def db_session():
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-
-    async with async_session() as session:
+    
+    async with async_session_local() as session:
         yield session
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def sample_project(db_session: AsyncSession):
     """Create a sample project for testing."""
     project = Project(
@@ -41,7 +42,8 @@ async def sample_project(db_session: AsyncSession):
     return project
 
 
-@pytest.fixture
+    
+@pytest_asyncio.fixture
 async def sample_project2(db_session: AsyncSession):
     """Create a second sample project for testing."""
     project = Project(

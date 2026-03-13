@@ -1,0 +1,7 @@
+=== QA Test 08: Incremental Message Retrieval ===
+Creating additional messages...
+
+Getting messages with last_message_id=1 (should return id > 1):
+{"detail":[{"type":"missing","loc":["query","session_unique_id"],"msg":"Field required","input":null}]}
+
+Result: PASS

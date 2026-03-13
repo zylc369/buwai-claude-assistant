@@ -14,6 +14,7 @@ router = APIRouter(prefix="/sessions", tags=["sessions"])
 
 class SessionCreate(BaseModel):
     session_unique_id: str
+    external_session_id: str
     project_unique_id: str
     workspace_unique_id: str
     directory: str
@@ -29,6 +30,8 @@ class SessionUpdate(BaseModel):
 class SessionResponse(BaseModel):
     id: int
     session_unique_id: str
+    external_session_id: str
+    sdk_session_id: Optional[str] = None
     project_unique_id: str
     workspace_unique_id: str
     directory: str
@@ -51,6 +54,7 @@ async def create_session(
     service = ConversationSessionService(db)
     session = await service.create_session(
         session_unique_id=session_data.session_unique_id,
+        external_session_id=session_data.external_session_id,
         project_unique_id=session_data.project_unique_id,
         workspace_unique_id=session_data.workspace_unique_id,
         directory=session_data.directory,
@@ -61,18 +65,20 @@ async def create_session(
 
 @router.get("/", response_model=List[SessionResponse])
 async def list_sessions(
-    project_unique_id: str,
-    workspace_unique_id: str,
+    project_unique_id: Optional[str] = None,
+    workspace_unique_id: Optional[str] = None,
+    external_session_id: Optional[str] = None,
     offset: int = 0,
     limit: int = 100,
     include_archived: bool = False,
     db: AsyncSession = Depends(get_db_session)
 ):
-    """Get sessions filtered by project and workspace (excludes archived by default)."""
+    """Get sessions with optional filters (excludes archived by default)."""
     service = ConversationSessionService(db)
     sessions = await service.list_sessions(
         project_unique_id=project_unique_id,
         workspace_unique_id=workspace_unique_id,
+        external_session_id=external_session_id,
         offset=offset,
         limit=limit,
         include_archived=include_archived,

@@ -14,7 +14,7 @@ import {
 
 export function useMessages(params: ListMessagesParams) {
   return useQuery<Message[]>({
-    queryKey: ['messages', params.session_unique_id, params.offset, params.limit],
+    queryKey: ['messages', params.session_unique_id, params.offset, params.limit, params.last_message_id],
     queryFn: () => apiClient.getMessages(params),
     enabled: !!params.session_unique_id,
   });

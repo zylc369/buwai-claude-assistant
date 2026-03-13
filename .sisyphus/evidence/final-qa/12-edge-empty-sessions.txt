@@ -1,0 +1,4 @@
+=== QA Test 12: Edge Case - Empty Sessions List ===
+[]
+
+Expected: Empty array []

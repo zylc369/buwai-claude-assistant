@@ -39,6 +39,7 @@ async def setup_test_data(db_session: AsyncSession):
     # Create session
     session = Session(
         session_unique_id="sess_001",
+        external_session_id="external-sess-001",
         project_unique_id="proj_001",
         workspace_unique_id="ws_001",
         directory="/test/path",
@@ -215,6 +216,7 @@ async def test_get_by_session_unique_id_empty(db_session: AsyncSession, setup_te
     # Create another session
     new_session = Session(
         session_unique_id="sess_002",
+        external_session_id="external-sess-002",
         project_unique_id="proj_001",
         workspace_unique_id="ws_001",
         directory="/test/path",
@@ -283,6 +285,7 @@ async def test_count_by_session_empty(db_session: AsyncSession, setup_test_data)
     # Create another session
     new_session = Session(
         session_unique_id="sess_count_empty",
+        external_session_id="external-sess-count-empty",
         project_unique_id="proj_001",
         workspace_unique_id="ws_001",
         directory="/test/path",

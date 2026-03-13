@@ -59,6 +59,7 @@ async def list_messages(
     session_unique_id: str,
     offset: int = 0,
     limit: int = 100,
+    last_message_id: Optional[int] = None,
     db: AsyncSession = Depends(get_db_session)
 ):
     """List messages for a session with pagination.
@@ -67,16 +68,25 @@ async def list_messages(
         session_unique_id: The unique identifier of the session (required).
         offset: Offset for pagination (default: 0).
         limit: Maximum number of results (default: 100).
+        last_message_id: If provided, only return messages with id > this value.
         
     Returns:
         List of messages belonging to the session.
     """
     service = MessageService(db)
-    messages = await service.list_messages(
-        session_unique_id=session_unique_id,
-        offset=offset,
-        limit=limit
-    )
+    
+    if last_message_id is not None:
+        messages = await service.list_messages_after_id(
+            session_unique_id=session_unique_id,
+            last_message_id=last_message_id,
+            limit=limit
+        )
+    else:
+        messages = await service.list_messages(
+            session_unique_id=session_unique_id,
+            offset=offset,
+            limit=limit
+        )
     return messages
 
 

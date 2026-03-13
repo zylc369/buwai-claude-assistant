@@ -25,12 +25,12 @@ export function TopBar() {
   };
 
   const handleCreateProject = async () => {
-    if (!newProjectName.trim() || !newProjectWorktree.trim()) return;
+    if (!newProjectName.trim()) return;
 
     try {
       const project = await createProject.mutateAsync({
         project_unique_id: crypto.randomUUID(),
-        worktree: newProjectWorktree.trim(),
+        worktree: newProjectWorktree.trim() || null,
         name: newProjectName.trim(),
       });
       setSelectedProject(project);
@@ -168,7 +168,7 @@ export function TopBar() {
 
                     <div>
                       <label className="text-sm font-medium mb-1.5 block">
-                        Worktree Path
+                        Worktree Path <span className="text-muted-foreground">(Optional)</span>
                       </label>
                       <Input
                         value={newProjectWorktree}
@@ -188,7 +188,7 @@ export function TopBar() {
                     </Button>
                     <Button
                       onClick={handleCreateProject}
-                      disabled={!newProjectName.trim() || !newProjectWorktree.trim() || createProject.isPending}
+                      disabled={!newProjectName.trim() || createProject.isPending}
                     >
                       {createProject.isPending ? "Creating..." : "Create"}
                     </Button>

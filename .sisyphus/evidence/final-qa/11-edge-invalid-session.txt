@@ -1,0 +1,4 @@
+=== QA Test 11: Edge Case - Invalid Session Lookup ===
+{"detail":"Session not found"}
+
+Expected: 404 Not Found

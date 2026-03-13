@@ -3,19 +3,19 @@
 import { useState } from "react";
 import { Dialog } from "@base-ui/react";
 import { Plus, MessageSquare, FolderOpen } from "lucide-react";
+import { uuidv7 } from "uuidv7";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useWorkspaceStore, useSessionStore, useProjectStore } from "@/lib/store";
 import { useWorkspaces, useCreateWorkspace } from "@/hooks/useWorkspaces";
+import { useCreateSession } from "@/hooks/useSessions";
 import { cn } from "@/lib/utils";
 import type { Session } from "@/lib/api/types";
 
 export function Sidebar() {
   const [isCreateWorkspaceDialogOpen, setIsCreateWorkspaceDialogOpen] = useState(false);
-  const [isCreateSessionDialogOpen, setIsCreateSessionDialogOpen] = useState(false);
   const [newWorkspaceName, setNewWorkspaceName] = useState("");
   const [newWorkspaceBranch, setNewWorkspaceBranch] = useState("");
-  const [newSessionTitle, setNewSessionTitle] = useState("");
 
   const { selectedWorkspace, setSelectedWorkspace } = useWorkspaceStore();
   const { selectedSession, setSelectedSession } = useSessionStore();
@@ -23,6 +23,7 @@ export function Sidebar() {
 
   const { data: workspaces = [], isLoading: workspacesLoading } = useWorkspaces(selectedProject?.project_unique_id);
   const createWorkspace = useCreateWorkspace();
+  const createSession = useCreateSession();
 
   const sessions: Session[] = [];
 
@@ -46,12 +47,20 @@ export function Sidebar() {
   };
 
   const handleCreateSession = async () => {
-    if (!newSessionTitle.trim() || !selectedWorkspace || !selectedProject) return;
+    if (!selectedWorkspace || !selectedProject) return;
+
+    const externalSessionId = uuidv7();
 
     try {
-      console.log("Create session:", newSessionTitle);
-      setIsCreateSessionDialogOpen(false);
-      setNewSessionTitle("");
+      const newSession = await createSession.mutateAsync({
+        session_unique_id: crypto.randomUUID(),
+        external_session_id: externalSessionId,
+        project_unique_id: selectedProject.project_unique_id,
+        workspace_unique_id: selectedWorkspace.workspace_unique_id,
+        directory: selectedProject.worktree,
+        title: "New Chat",
+      });
+      setSelectedSession(newSession);
     } catch (error) {
       console.error("Failed to create session:", error);
     }
@@ -129,7 +138,8 @@ export function Sidebar() {
             <Button
               variant="ghost"
               size="icon-xs"
-              onClick={() => setIsCreateSessionDialogOpen(true)}
+              onClick={handleCreateSession}
+              disabled={createSession.isPending}
               className="h-5 w-5"
             >
               <Plus className="size-3" />
@@ -230,73 +240,6 @@ export function Sidebar() {
                   disabled={!newWorkspaceName.trim() || createWorkspace.isPending}
                 >
                   {createWorkspace.isPending ? "Creating..." : "Create"}
-                </Button>
-              </div>
-
-              <Dialog.Close
-                className="absolute right-4 top-4 rounded-sm opacity-70 hover:opacity-100 cursor-pointer"
-              >
-                <span className="sr-only">Close</span>
-                ×
-              </Dialog.Close>
-            </Dialog.Popup>
-          </div>
-        </Dialog.Portal>
-      </Dialog.Root>
-
-      <Dialog.Root open={isCreateSessionDialogOpen} onOpenChange={setIsCreateSessionDialogOpen}>
-        <Dialog.Portal>
-          <Dialog.Backdrop
-            className={cn(
-              "fixed inset-0 bg-black/50 z-50",
-              "animate-in fade-in-0",
-              "data-[state=closed]:animate-out data-[state=closed]:fade-out-0"
-            )}
-          />
-          <div className="fixed inset-0 z-50 flex items-center justify-center">
-            <Dialog.Popup
-              className={cn(
-                "w-full max-w-sm rounded-xl border border-border bg-background p-6 shadow-xl",
-                "animate-in fade-in-0 zoom-in-95",
-                "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95"
-              )}
-            >
-              <Dialog.Title className="text-base font-semibold mb-4">
-                New Session
-              </Dialog.Title>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium mb-1.5 block">
-                    Session Title
-                  </label>
-                  <Input
-                    value={newSessionTitle}
-                    onChange={(e) => setNewSessionTitle(e.target.value)}
-                    placeholder="Enter session title..."
-                    className="w-full"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        handleCreateSession();
-                      }
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 mt-6">
-                <Button
-                  variant="outline"
-                  onClick={() => setIsCreateSessionDialogOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleCreateSession}
-                  disabled={!newSessionTitle.trim()}
-                >
-                  Create
                 </Button>
               </div>
 

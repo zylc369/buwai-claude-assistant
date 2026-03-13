@@ -359,6 +359,7 @@ class TestProjectServiceDelete:
         current_time = int(time_module.time())
         session = Session(
             session_unique_id="sess-cascade-001",
+            external_session_id="external-sess-cascade-001",
             project_unique_id="proj-cascade-002",
             workspace_unique_id="ws-cascade-002",
             directory="/test/dir",
@@ -399,6 +400,7 @@ class TestProjectServiceDelete:
         current_time = int(time_module.time())
         session = Session(
             session_unique_id="sess-cascade-002",
+            external_session_id="external-sess-cascade-002",
             project_unique_id="proj-cascade-003",
             workspace_unique_id="ws-cascade-003",
             directory="/test/dir",

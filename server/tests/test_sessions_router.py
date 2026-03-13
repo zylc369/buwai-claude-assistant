@@ -107,6 +107,7 @@ async def test_workspace(db_session: AsyncSession, test_project: Project):
 async def test_conversation_session(db_session: AsyncSession, test_project: Project, test_workspace: Workspace):
     session = Session(
         session_unique_id="sess-test-001",
+        external_session_id="external-sess-test-001",
         project_unique_id=test_project.project_unique_id,
         workspace_unique_id=test_workspace.workspace_unique_id,
         directory="/test/dir",
@@ -133,6 +134,7 @@ class TestCreateSession:
             "/sessions/",
             json={
                 "session_unique_id": "sess-new-001",
+                "external_session_id": "external-sess-new-001",
                 "project_unique_id": test_project.project_unique_id,
                 "workspace_unique_id": test_workspace.workspace_unique_id,
                 "directory": "/test/dir",
@@ -158,6 +160,7 @@ class TestCreateSession:
             "/sessions/",
             json={
                 "session_unique_id": "sess-ts-001",
+                "external_session_id": "external-sess-ts-001",
                 "project_unique_id": test_project.project_unique_id,
                 "workspace_unique_id": test_workspace.workspace_unique_id,
                 "directory": "/test/dir",
@@ -204,6 +207,7 @@ class TestListSessions:
     ):
         archived_session = Session(
             session_unique_id="sess-archived-001",
+            external_session_id="external-sess-archived-001",
             project_unique_id=test_project.project_unique_id,
             workspace_unique_id=test_workspace.workspace_unique_id,
             directory="/test/dir",
@@ -238,6 +242,7 @@ class TestListSessions:
     ):
         archived_session = Session(
             session_unique_id="sess-archived-002",
+            external_session_id="external-sess-archived-002",
             project_unique_id=test_project.project_unique_id,
             workspace_unique_id=test_workspace.workspace_unique_id,
             directory="/test/dir",
@@ -412,6 +417,7 @@ class TestUnarchiveSession:
     ):
         archived_session = Session(
             session_unique_id="sess-unarchive-001",
+            external_session_id="external-sess-unarchive-001",
             project_unique_id=test_project.project_unique_id,
             workspace_unique_id=test_workspace.workspace_unique_id,
             directory="/test/dir",
@@ -437,3 +443,130 @@ class TestUnarchiveSession:
         response = await client.post("/sessions/non-existent-id/unarchive")
         
         assert response.status_code == 404
+
+
+class TestGetSessionsByExternalSessionId:
+    
+    @pytest.mark.asyncio
+    async def test_get_sessions_by_external_session_id(
+        self,
+        client: AsyncClient,
+        test_project: Project,
+        test_workspace: Workspace,
+        db_session: AsyncSession
+    ):
+        session = Session(
+            session_unique_id="sess-ext-filter-001",
+            external_session_id="ext-session-unique-123",
+            project_unique_id=test_project.project_unique_id,
+            workspace_unique_id=test_workspace.workspace_unique_id,
+            directory="/test/dir",
+            title="External Filter Session",
+            time_created=1000,
+            time_updated=1000,
+        )
+        db_session.add(session)
+        await db_session.commit()
+        
+        other_session = Session(
+            session_unique_id="sess-ext-filter-002",
+            external_session_id="ext-session-other-456",
+            project_unique_id=test_project.project_unique_id,
+            workspace_unique_id=test_workspace.workspace_unique_id,
+            directory="/test/dir",
+            title="Other Session",
+            time_created=1000,
+            time_updated=1000,
+        )
+        db_session.add(other_session)
+        await db_session.commit()
+        
+        response = await client.get(
+            "/sessions/",
+            params={"external_session_id": "ext-session-unique-123"}
+        )
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["external_session_id"] == "ext-session-unique-123"
+        assert data[0]["session_unique_id"] == "sess-ext-filter-001"
+    
+    @pytest.mark.asyncio
+    async def test_get_sessions_by_external_session_id_not_found(
+        self,
+        client: AsyncClient
+    ):
+        response = await client.get(
+            "/sessions/",
+            params={"external_session_id": "non-existent-external-id"}
+        )
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 0
+
+
+class TestSessionResponseFields:
+    
+    @pytest.mark.asyncio
+    async def test_session_response_includes_external_session_id(
+        self,
+        client: AsyncClient,
+        test_conversation_session: Session
+    ):
+        response = await client.get(
+            f"/sessions/{test_conversation_session.session_unique_id}"
+        )
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert "external_session_id" in data
+        assert data["external_session_id"] == test_conversation_session.external_session_id
+    
+    @pytest.mark.asyncio
+    async def test_session_response_includes_sdk_session_id(
+        self,
+        client: AsyncClient,
+        test_project: Project,
+        test_workspace: Workspace,
+        db_session: AsyncSession
+    ):
+        session = Session(
+            session_unique_id="sess-sdk-response-001",
+            external_session_id="ext-sess-sdk-response-001",
+            sdk_session_id="sdk-session-abc123",
+            project_unique_id=test_project.project_unique_id,
+            workspace_unique_id=test_workspace.workspace_unique_id,
+            directory="/test/dir",
+            title="SDK Session Response",
+            time_created=1000,
+            time_updated=1000,
+        )
+        db_session.add(session)
+        await db_session.commit()
+        await db_session.refresh(session)
+        
+        response = await client.get(
+            f"/sessions/{session.session_unique_id}"
+        )
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert "sdk_session_id" in data
+        assert data["sdk_session_id"] == "sdk-session-abc123"
+    
+    @pytest.mark.asyncio
+    async def test_session_response_sdk_session_id_null_when_not_set(
+        self,
+        client: AsyncClient,
+        test_conversation_session: Session
+    ):
+        response = await client.get(
+            f"/sessions/{test_conversation_session.session_unique_id}"
+        )
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert "sdk_session_id" in data
+        assert data["sdk_session_id"] is None

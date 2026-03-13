@@ -114,6 +114,7 @@ async def setup_test_data(db_session: AsyncSession):
     
     session = Session(
         session_unique_id="sess_msg_001",
+        external_session_id="external-sess-msg-001",
         project_unique_id="proj_msg_001",
         workspace_unique_id="ws_msg_001",
         directory="/test/path",
@@ -169,6 +170,7 @@ class TestListMessages:
         
         new_session = Session(
             session_unique_id="sess_empty_msg",
+            external_session_id="external-sess-empty-msg",
             project_unique_id="proj_msg_001",
             workspace_unique_id="ws_msg_001",
             directory="/test/path",

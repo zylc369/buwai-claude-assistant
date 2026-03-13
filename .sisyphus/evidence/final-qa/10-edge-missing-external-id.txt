@@ -1,0 +1,4 @@
+=== QA Test 10: Edge Case - Missing external_session_id ===
+{"detail":[{"type":"missing","loc":["body","external_session_id"],"msg":"Field required","input":{"session_unique_id":"test-no-external","project_unique_id":"test-qa-project-1","workspace_unique_id":"test-qa-workspace-1","directory":"/tmp/test","title":"No External ID"}}]}
+
+Expected: 422 Validation Error

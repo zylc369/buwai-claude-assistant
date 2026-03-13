@@ -1,13 +1,16 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { useMessages } from "@/hooks/useMessages";
 import { useSessionStore } from "@/lib/stores/useSessionStore";
 import { cn } from "@/lib/utils";
 import { Bot, User } from "lucide-react";
+import { Message } from "@/lib/api/types";
 
 interface ChatAreaProps {
+  messages: Message[];
+  isLoading?: boolean;
   streamingContent?: string;
+  sdkSessionId?: string;
 }
 
 function parseMessageData(data: string): { role: string; content: string } {
@@ -24,13 +27,9 @@ function parseMessageData(data: string): { role: string; content: string } {
   }
 }
 
-export function ChatArea({ streamingContent }: ChatAreaProps) {
+export function ChatArea({ messages, isLoading, streamingContent, sdkSessionId }: ChatAreaProps) {
   const { selectedSession } = useSessionStore();
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  const { data: messages = [], isLoading } = useMessages({
-    session_unique_id: selectedSession?.session_unique_id || "",
-  });
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -60,6 +59,12 @@ export function ChatArea({ streamingContent }: ChatAreaProps) {
 
   return (
     <div className="flex flex-col h-full overflow-y-auto p-4 gap-4">
+      {sdkSessionId && (
+        <div className="flex items-center justify-between text-xs text-muted-foreground border-b border-border pb-2">
+          <span>SDK Session ID</span>
+          <span className="font-mono text-[10px]">{sdkSessionId}</span>
+        </div>
+      )}
       {messages.length === 0 && !streamingContent ? (
         <div className="flex h-full items-center justify-center text-muted-foreground">
           <div className="text-center">

@@ -1,0 +1,4 @@
+=== QA Test 03: List Projects ===
+[{"id":1,"project_unique_id":"test-qa-project-1","worktree":"/tmp/test-qa-project","branch":null,"name":null,"time_initialized":null,"time_created":1773414264,"time_updated":1773414264}]
+
+Result: PASS

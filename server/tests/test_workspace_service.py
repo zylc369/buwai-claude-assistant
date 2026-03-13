@@ -334,6 +334,7 @@ class TestWorkspaceServiceDelete:
 
         session = Session(
             session_unique_id="sess-001",
+            external_session_id="external-sess-001",
             project_unique_id="proj-001",
             workspace_unique_id="ws-001",
             directory="/path/to/session",

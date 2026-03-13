@@ -477,6 +477,7 @@ class TestProjectRepositoryDelete:
         current_time = int(time.time())
         session = Session(
             session_unique_id="sess-001",
+            external_session_id="external-sess-001",
             project_unique_id="proj-cascade-002",
             workspace_unique_id="ws-002",
             directory="/test/dir",
@@ -526,6 +527,7 @@ class TestProjectRepositoryDelete:
         current_time = int(time.time())
         session = Session(
             session_unique_id="sess-002",
+            external_session_id="external-sess-002",
             project_unique_id="proj-cascade-003",
             workspace_unique_id="ws-003",
             directory="/test/dir",

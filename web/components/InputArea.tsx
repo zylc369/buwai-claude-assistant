@@ -10,9 +10,10 @@ import { Button } from "@/components/ui/button";
 interface InputAreaProps {
   onStreamingContent?: (content: string) => void;
   onStreamEnd?: () => void;
+  onSdkSessionId?: (sdkSessionId: string) => void;
 }
 
-export function InputArea({ onStreamingContent, onStreamEnd }: InputAreaProps) {
+export function InputArea({ onStreamingContent, onStreamEnd, onSdkSessionId }: InputAreaProps) {
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -66,6 +67,9 @@ export function InputArea({ onStreamingContent, onStreamEnd }: InputAreaProps) {
           accumulatedContent += content;
           onStreamingContent?.(accumulatedContent);
         } else if (event.type === "done") {
+          if (event.sdk_session_id) {
+            onSdkSessionId?.(event.sdk_session_id);
+          }
           onStreamEnd?.();
         } else if (event.type === "error") {
           console.error("Stream error:", event.message);

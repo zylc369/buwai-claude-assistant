@@ -1,13 +1,30 @@
 {
-  "active_plan": "/Users/aserlili/Documents/Codes/buwai-claude-assistant/.sisyphus/plans/ai-workspace-rewrite.md",
-  "started_at": "2026-03-13T07:45:00.000Z",
-  "current_wave": 5,
-  "wave_status": "in_progress",
+  "active_plan": "/Users/aserlili/Documents/Codes/buwai-claude-assistant/.sisyphus/plans/frontend-chat-fix.md",
+  "started_at": "2026-03-13T13:51:27.011Z",
   "session_ids": [
-    "ses_31a45001cffeao9cNuOY2Y4ab4"
+    "ses_318ac4ed9ffeP3BccVfIyk2dOG"
   ],
-  "plan_name": "ai-workspace-rewrite",
+  "plan_name": "frontend-chat-fix",
   "agent": "atlas",
-  "worktree_path": "/Users/aserlili/Documents/Codes/buwai-claude-assistant",
-  "last_updated": "2026-03-13T15:35:00.000Z"
+  "completed_tasks": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18
+  ],
+  "status": "all_tasks_completed"
 }

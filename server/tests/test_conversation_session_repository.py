@@ -54,6 +54,7 @@ async def create_test_session(
     current_time = int(time.time())
     return await repo.create(
         session_unique_id=session_unique_id,
+        external_session_id=f"external-{session_unique_id}",
         project_unique_id=project_unique_id,
         workspace_unique_id=workspace_unique_id,
         directory=directory,
@@ -989,3 +990,110 @@ class TestConversationSessionRepositoryExists:
         repo = ConversationSessionRepository(db_session)
         
         assert await repo.exists(99999) is False
+
+
+class TestConversationSessionRepositoryGetByExternalSessionId:
+    """Tests for ConversationSessionRepository.get_by_external_session_id method."""
+
+    @pytest.mark.asyncio
+    async def test_get_by_external_session_id_found(self, db_session: AsyncSession):
+        """Test getting an existing session by external_session_id."""
+        project, workspace = await create_test_project_and_workspace(
+            db_session,
+            project_unique_id="proj-ext-001",
+            workspace_unique_id="ws-ext-001",
+        )
+        repo = ConversationSessionRepository(db_session)
+        
+        session = await create_test_session(
+            repo,
+            session_unique_id="sess-ext-001",
+            project_unique_id="proj-ext-001",
+            workspace_unique_id="ws-ext-001",
+            title="External Session",
+        )
+        await db_session.commit()
+        
+        result = await repo.get_by_external_session_id("external-sess-ext-001")
+        
+        assert result is not None
+        assert result.session_unique_id == "sess-ext-001"
+        assert result.external_session_id == "external-sess-ext-001"
+        assert result.title == "External Session"
+
+    @pytest.mark.asyncio
+    async def test_get_by_external_session_id_not_found(self, db_session: AsyncSession):
+        """Test getting a non-existent session by external_session_id."""
+        repo = ConversationSessionRepository(db_session)
+        
+        result = await repo.get_by_external_session_id("non-existent-external-id")
+        
+        assert result is None
+
+
+class TestConversationSessionRepositoryCreateWithSdkSessionId:
+    """Tests for creating sessions with sdk_session_id."""
+
+    @pytest.mark.asyncio
+    async def test_create_session_with_sdk_session_id(self, db_session: AsyncSession):
+        """Test creating a session with sdk_session_id."""
+        project, workspace = await create_test_project_and_workspace(
+            db_session,
+            project_unique_id="proj-sdk-001",
+            workspace_unique_id="ws-sdk-001",
+        )
+        repo = ConversationSessionRepository(db_session)
+        
+        current_time = int(time.time())
+        session = await repo.create_session(
+            session_unique_id="sess-sdk-001",
+            external_session_id="external-sess-sdk-001",
+            project_unique_id="proj-sdk-001",
+            workspace_unique_id="ws-sdk-001",
+            directory="/test/sdk/dir",
+            title="SDK Session",
+            sdk_session_id="sdk-session-12345",
+            time_created=current_time,
+            time_updated=current_time,
+        )
+        await db_session.commit()
+        
+        assert session.id is not None
+        assert session.session_unique_id == "sess-sdk-001"
+        assert session.external_session_id == "external-sess-sdk-001"
+        assert session.sdk_session_id == "sdk-session-12345"
+        assert session.title == "SDK Session"
+
+
+class TestConversationSessionRepositoryUpdateSdkSessionId:
+    """Tests for updating sdk_session_id."""
+
+    @pytest.mark.asyncio
+    async def test_update_session_sdk_session_id(self, db_session: AsyncSession):
+        """Test updating sdk_session_id for an existing session."""
+        project, workspace = await create_test_project_and_workspace(
+            db_session,
+            project_unique_id="proj-sdk-update",
+            workspace_unique_id="ws-sdk-update",
+        )
+        repo = ConversationSessionRepository(db_session)
+        
+        session = await create_test_session(
+            repo,
+            session_unique_id="sess-sdk-update",
+            project_unique_id="proj-sdk-update",
+            workspace_unique_id="ws-sdk-update",
+            title="SDK Update Session",
+        )
+        await db_session.commit()
+        
+        assert session.sdk_session_id is None
+        
+        updated = await repo.update_session(
+            session,
+            sdk_session_id="new-sdk-session-67890",
+        )
+        await db_session.commit()
+        
+        assert updated.sdk_session_id == "new-sdk-session-67890"
+        assert updated.session_unique_id == "sess-sdk-update"

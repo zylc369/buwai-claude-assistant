@@ -44,6 +44,7 @@ class ConversationSessionService:
     async def create_session(
         self,
         session_unique_id: str,
+        external_session_id: str,
         project_unique_id: str,
         workspace_unique_id: str,
         directory: str,
@@ -52,23 +53,25 @@ class ConversationSessionService:
         time_archived: Optional[int] = None,
     ) -> Session:
         """Create a new conversation session.
-        
+
         Args:
             session_unique_id: Unique identifier for the session.
+            external_session_id: External session identifier (required).
             project_unique_id: The unique identifier of the project.
             workspace_unique_id: The unique identifier of the workspace.
             directory: The working directory path.
             title: The session title.
             time_compacting: Optional compacting timestamp.
             time_archived: Optional archived timestamp.
-            
+
         Returns:
             Created Session instance.
         """
         current_time = int(time.time())
-        
+
         session = await self.session_repo.create(
             session_unique_id=session_unique_id,
+            external_session_id=external_session_id,
             project_unique_id=project_unique_id,
             workspace_unique_id=workspace_unique_id,
             directory=directory,
@@ -78,27 +81,43 @@ class ConversationSessionService:
             time_compacting=time_compacting,
             time_archived=time_archived,
         )
-        
+
         await self.session.commit()
         await self.session.refresh(session)
-        
+
         return session
     
     async def get_by_unique_id(self, session_unique_id: str) -> Optional[Session]:
         """Get a session by its unique identifier.
-        
+
         Args:
             session_unique_id: The session's unique identifier.
-            
+
         Returns:
             Session instance if found, None otherwise.
         """
         return await self.session_repo.get_by_unique_id(session_unique_id)
-    
+
+    async def get_session_by_external_id(
+        self, external_session_id: str
+    ) -> Optional[Session]:
+        """Get a session by its external session identifier.
+
+        Args:
+            external_session_id: The external session identifier.
+
+        Returns:
+            Session instance if found, None otherwise.
+        """
+        return await self.session_repo.get_by_external_session_id(
+            external_session_id
+        )
+
     async def list_sessions(
         self,
         project_unique_id: Optional[str] = None,
         workspace_unique_id: Optional[str] = None,
+        external_session_id: Optional[str] = None,
         offset: int = 0,
         limit: int = 100,
         include_archived: bool = False,
@@ -108,6 +127,7 @@ class ConversationSessionService:
         Args:
             project_unique_id: Optional filter by project unique ID.
             workspace_unique_id: Optional filter by workspace unique ID.
+            external_session_id: Optional filter by external session ID.
             offset: Offset for pagination (default: 0).
             limit: Maximum number of results (default: 100).
             include_archived: Whether to include archived sessions (default: False).
@@ -118,6 +138,7 @@ class ConversationSessionService:
         return await self.session_repo.list(
             project_unique_id=project_unique_id,
             workspace_unique_id=workspace_unique_id,
+            external_session_id=external_session_id,
             offset=offset,
             limit=limit,
             include_archived=include_archived,

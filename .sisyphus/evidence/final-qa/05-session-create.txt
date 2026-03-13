@@ -1,0 +1,3 @@
+=== QA Test 05: Session Creation with external_session_id ===
+{"id":1,"session_unique_id":"test-qa-session-1","external_session_id":"019449a8-7e3b-7d2e-8c3f-4a5b6c7d8e9f","sdk_session_id":null,"project_unique_id":"test-qa-project-1","workspace_unique_id":"test-qa-workspace-1","directory":"/tmp/test-qa-project","title":"QA Test Session","time_created":1773414288,"time_updated":1773414288,"time_compacting":null,"time_archived":null}
+

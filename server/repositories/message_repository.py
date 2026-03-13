@@ -118,6 +118,31 @@ class MessageRepository(BaseRepository[Message]):
         await self.session.flush()
         return instance
     
+    async def get_messages_after_id(
+        self,
+        session_unique_id: str,
+        last_message_id: int,
+        limit: int = 100
+    ) -> List[Message]:
+        """Get messages with id greater than last_message_id for incremental fetching.
+        
+        Args:
+            session_unique_id: The unique identifier of the session.
+            last_message_id: Only return messages with id > this value.
+            limit: Maximum number of results (default: 100).
+            
+        Returns:
+            List of messages with id > last_message_id, ordered by time_created.
+        """
+        result = await self.session.execute(
+            select(Message)
+            .where(Message.session_unique_id == session_unique_id)
+            .where(Message.id > last_message_id)
+            .order_by(Message.time_created)
+            .limit(limit)
+        )
+        return list(result.scalars().all())
+    
     async def count_by_session(self, session_unique_id: str) -> int:
         """Count messages for a specific session.
         

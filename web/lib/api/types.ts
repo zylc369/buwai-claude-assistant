@@ -19,7 +19,7 @@ export interface Project {
 
 export interface CreateProjectRequest {
   project_unique_id: string;
-  worktree: string;
+  worktree: string | null;
   name?: string | null;
   branch?: string | null;
   time_initialized?: number | null;
@@ -81,6 +81,8 @@ export interface ListWorkspacesParams {
 export interface Session {
   id: number;
   session_unique_id: string;
+  external_session_id: string;
+  sdk_session_id?: string | null;
   project_unique_id: string;
   workspace_unique_id: string;
   directory: string;
@@ -93,6 +95,7 @@ export interface Session {
 
 export interface CreateSessionRequest {
   session_unique_id: string;
+  external_session_id: string;
   project_unique_id: string;
   workspace_unique_id: string;
   directory: string;
@@ -140,6 +143,7 @@ export interface ListMessagesParams {
   session_unique_id: string;
   offset?: number;
   limit?: number;
+  last_message_id?: number;
 }
 
 // ============================================
@@ -164,6 +168,7 @@ export interface SSEEvent {
   content?: unknown;
   session_unique_id?: string;
   message?: string;
+  sdk_session_id?: string;
 }
 
 // ============================================
