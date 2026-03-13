@@ -1,8 +1,175 @@
 /**
- * API Types - TypeScript interfaces for API responses
+ * API Types - TypeScript interfaces for API requests and responses
  */
 
-// User types
+// ============================================
+// Project types
+// ============================================
+
+export interface Project {
+  id: number;
+  project_unique_id: string;
+  worktree: string;
+  branch: string | null;
+  name: string | null;
+  time_initialized: number | null;
+  time_created: number;
+  time_updated: number;
+}
+
+export interface CreateProjectRequest {
+  project_unique_id: string;
+  worktree: string;
+  name?: string | null;
+  branch?: string | null;
+  time_initialized?: number | null;
+}
+
+export interface UpdateProjectRequest {
+  worktree?: string;
+  name?: string | null;
+  branch?: string | null;
+  time_initialized?: number | null;
+}
+
+export interface ListProjectsParams {
+  offset?: number;
+  limit?: number;
+  name?: string;
+}
+
+// ============================================
+// Workspace types
+// ============================================
+
+export interface Workspace {
+  id: number;
+  workspace_unique_id: string;
+  project_unique_id: string;
+  name: string | null;
+  branch: string | null;
+  directory: string | null;
+  extra: string | null;
+}
+
+export interface CreateWorkspaceRequest {
+  workspace_unique_id: string;
+  project_unique_id: string;
+  name?: string | null;
+  branch?: string | null;
+  directory?: string | null;
+  extra?: string | null;
+}
+
+export interface UpdateWorkspaceRequest {
+  name?: string | null;
+  branch?: string | null;
+  directory?: string | null;
+  extra?: string | null;
+}
+
+export interface ListWorkspacesParams {
+  project_unique_id: string;
+  offset?: number;
+  limit?: number;
+}
+
+// ============================================
+// Session types (Conversation)
+// ============================================
+
+export interface Session {
+  id: number;
+  session_unique_id: string;
+  project_unique_id: string;
+  workspace_unique_id: string;
+  directory: string;
+  title: string;
+  time_created: number;
+  time_updated: number;
+  time_compacting: number | null;
+  time_archived: number | null;
+}
+
+export interface CreateSessionRequest {
+  session_unique_id: string;
+  project_unique_id: string;
+  workspace_unique_id: string;
+  directory: string;
+  title: string;
+}
+
+export interface UpdateSessionRequest {
+  title?: string;
+  directory?: string;
+  time_compacting?: number | null;
+}
+
+export interface ListSessionsParams {
+  project_unique_id: string;
+  workspace_unique_id: string;
+  offset?: number;
+  limit?: number;
+  include_archived?: boolean;
+}
+
+// ============================================
+// Message types
+// ============================================
+
+export interface Message {
+  id: number;
+  message_unique_id: string;
+  session_unique_id: string;
+  time_created: number;
+  time_updated: number;
+  data: string;
+}
+
+export interface CreateMessageRequest {
+  message_unique_id: string;
+  session_unique_id: string;
+  data: Record<string, unknown>;
+}
+
+export interface UpdateMessageRequest {
+  data?: Record<string, unknown>;
+}
+
+export interface ListMessagesParams {
+  session_unique_id: string;
+  offset?: number;
+  limit?: number;
+}
+
+// ============================================
+// AI Send types
+// ============================================
+
+export interface AISendRequest {
+  prompt: string;
+  session_unique_id: string;
+  cwd: string;
+  settings: string;
+  system_prompt?: string;
+}
+
+export interface AISendResponse {
+  session_unique_id: string;
+  status: string;
+}
+
+export interface SSEEvent {
+  type: 'chunk' | 'done' | 'error';
+  content?: unknown;
+  session_unique_id?: string;
+  message?: string;
+}
+
+// ============================================
+// Legacy types (for backward compatibility)
+// ============================================
+
 export interface User {
   id: number;
   email: string;
@@ -26,26 +193,6 @@ export interface UpdateUserRequest {
   is_active?: boolean;
 }
 
-// Project types
-export interface Project {
-  id: number;
-  name: string;
-  description: string | null;
-  owner_id: number;
-}
-
-export interface CreateProjectRequest {
-  name: string;
-  owner_id: number;
-  description?: string;
-}
-
-export interface UpdateProjectRequest {
-  name?: string;
-  description?: string;
-}
-
-// Task types
 export interface Task {
   id: number;
   title: string;
@@ -79,15 +226,4 @@ export interface UpdateTaskRequest {
   due_date?: string;
 }
 
-// Session types
-export interface Session {
-  id: number;
-  user_id: number;
-  token: string;
-  expires_at: string;
-}
-
-export interface CreateSessionRequest {
-  user_id: number;
-  expires_in_hours?: number;
-}
+export type ChatSession = Session;

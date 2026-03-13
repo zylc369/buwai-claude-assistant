@@ -1,6 +1,22 @@
-/**
- * API Client - Base fetch wrapper with error handling
- */
+import type {
+  Project,
+  CreateProjectRequest,
+  UpdateProjectRequest,
+  ListProjectsParams,
+  Workspace,
+  CreateWorkspaceRequest,
+  UpdateWorkspaceRequest,
+  ListWorkspacesParams,
+  Session,
+  CreateSessionRequest,
+  UpdateSessionRequest,
+  ListSessionsParams,
+  Message,
+  CreateMessageRequest,
+  ListMessagesParams,
+  AISendRequest,
+  SSEEvent,
+} from './types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -24,7 +40,6 @@ async function handleResponse<T>(response: Response): Promise<T> {
     throw new ApiClientError(error.detail || 'An error occurred', response.status);
   }
   
-  // Handle 204 No Content
   if (response.status === 204) {
     return {} as T;
   }
@@ -32,7 +47,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
   return response.json();
 }
 
-export async function apiClient<T>(
+async function fetchApi<T>(
   endpoint: string,
   options?: RequestInit
 ): Promise<T> {
@@ -50,22 +65,204 @@ export async function apiClient<T>(
   return handleResponse<T>(response);
 }
 
-export const api = {
+const api = {
   get: <T>(endpoint: string) => 
-    apiClient<T>(endpoint, { method: 'GET' }),
+    fetchApi<T>(endpoint, { method: 'GET' }),
   
   post: <T>(endpoint: string, data?: unknown) =>
-    apiClient<T>(endpoint, {
+    fetchApi<T>(endpoint, {
       method: 'POST',
       body: data ? JSON.stringify(data) : undefined,
     }),
   
   put: <T>(endpoint: string, data?: unknown) =>
-    apiClient<T>(endpoint, {
+    fetchApi<T>(endpoint, {
       method: 'PUT',
       body: data ? JSON.stringify(data) : undefined,
     }),
   
   delete: <T>(endpoint: string) =>
-    apiClient<T>(endpoint, { method: 'DELETE' }),
+    fetchApi<T>(endpoint, { method: 'DELETE' }),
 };
+
+function buildQueryString<T extends object>(params: T | undefined): string {
+  if (!params) return '';
+  
+  const searchParams = new URLSearchParams();
+  
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null) {
+      searchParams.append(key, String(value));
+    }
+  }
+  
+  const queryString = searchParams.toString();
+  return queryString ? `?${queryString}` : '';
+}
+
+export class APIClient {
+  // ============================================
+  // Project methods
+  // ============================================
+  
+  async getProjects(params?: ListProjectsParams): Promise<Project[]> {
+    const query = buildQueryString(params);
+    return api.get<Project[]>(`/projects/${query}`);
+  }
+  
+  async createProject(data: CreateProjectRequest): Promise<Project> {
+    return api.post<Project>('/projects/', data);
+  }
+  
+  async getProjectByUniqueId(projectUniqueId: string): Promise<Project> {
+    return api.get<Project>(`/projects/${projectUniqueId}`);
+  }
+  
+  async updateProject(projectUniqueId: string, data: UpdateProjectRequest): Promise<Project> {
+    return api.put<Project>(`/projects/${projectUniqueId}`, data);
+  }
+  
+  async deleteProject(projectUniqueId: string): Promise<void> {
+    return api.delete<void>(`/projects/${projectUniqueId}`);
+  }
+  
+  // ============================================
+  // Workspace methods
+  // ============================================
+  
+  async getWorkspaces(params: ListWorkspacesParams): Promise<Workspace[]> {
+    const query = buildQueryString(params);
+    return api.get<Workspace[]>(`/workspaces/${query}`);
+  }
+  
+  async createWorkspace(data: CreateWorkspaceRequest): Promise<Workspace> {
+    return api.post<Workspace>('/workspaces/', data);
+  }
+  
+  async getWorkspaceByUniqueId(workspaceUniqueId: string): Promise<Workspace> {
+    return api.get<Workspace>(`/workspaces/${workspaceUniqueId}`);
+  }
+  
+  async updateWorkspace(workspaceUniqueId: string, data: UpdateWorkspaceRequest): Promise<Workspace> {
+    return api.put<Workspace>(`/workspaces/${workspaceUniqueId}`, data);
+  }
+  
+  async deleteWorkspace(workspaceUniqueId: string): Promise<void> {
+    return api.delete<void>(`/workspaces/${workspaceUniqueId}`);
+  }
+  
+  // ============================================
+  // Session methods
+  // ============================================
+  
+  async getSessions(params: ListSessionsParams): Promise<Session[]> {
+    const query = buildQueryString(params);
+    return api.get<Session[]>(`/sessions/${query}`);
+  }
+  
+  async createSession(data: CreateSessionRequest): Promise<Session> {
+    return api.post<Session>('/sessions/', data);
+  }
+  
+  async getSessionByUniqueId(sessionUniqueId: string): Promise<Session> {
+    return api.get<Session>(`/sessions/${sessionUniqueId}`);
+  }
+  
+  async updateSession(sessionUniqueId: string, data: UpdateSessionRequest): Promise<Session> {
+    return api.put<Session>(`/sessions/${sessionUniqueId}`, data);
+  }
+  
+  async deleteSession(sessionUniqueId: string): Promise<void> {
+    return api.delete<void>(`/sessions/${sessionUniqueId}`);
+  }
+  
+  async archiveSession(sessionUniqueId: string): Promise<Session> {
+    return api.post<Session>(`/sessions/${sessionUniqueId}/archive`);
+  }
+  
+  async unarchiveSession(sessionUniqueId: string): Promise<Session> {
+    return api.post<Session>(`/sessions/${sessionUniqueId}/unarchive`);
+  }
+  
+  // ============================================
+  // Message methods
+  // ============================================
+  
+  async getMessages(params: ListMessagesParams): Promise<Message[]> {
+    const query = buildQueryString(params);
+    return api.get<Message[]>(`/messages/${query}`);
+  }
+  
+  async createMessage(data: CreateMessageRequest): Promise<Message> {
+    return api.post<Message>('/messages/', data);
+  }
+  
+  async getMessageByUniqueId(messageUniqueId: string): Promise<Message> {
+    return api.get<Message>(`/messages/${messageUniqueId}`);
+  }
+  
+  // ============================================
+  // AI Send method (streaming)
+  // ============================================
+  
+  async sendAIPrompt(request: AISendRequest): Promise<Response> {
+    const url = `${API_BASE_URL}/messages/send`;
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(request),
+    });
+    
+    if (!response.ok) {
+      const error: ApiError = await response.json();
+      throw new ApiClientError(error.detail || 'An error occurred', response.status);
+    }
+    
+    return response;
+  }
+  
+  async *streamAIResponse(request: AISendRequest): AsyncGenerator<SSEEvent> {
+    const response = await this.sendAIPrompt(request);
+    const reader = response.body?.getReader();
+    
+    if (!reader) {
+      throw new ApiClientError('No response body', 500);
+    }
+    
+    const decoder = new TextDecoder();
+    let buffer = '';
+    
+    while (true) {
+      const { done, value } = await reader.read();
+      
+      if (done) {
+        break;
+      }
+      
+      buffer += decoder.decode(value, { stream: true });
+      
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+      
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const data = line.slice(6);
+          if (data.trim()) {
+            try {
+              const event = JSON.parse(data) as SSEEvent;
+              yield event;
+            } catch {
+              // Skip malformed JSON
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+export const apiClient = new APIClient();
+export { api };
