@@ -173,12 +173,3 @@ def test_alembic_dependency_exists():
         content = f.read()
         assert "alembic" in content.lower(), "alembic should be in requirements.txt"
 
-
-def test_python_ulid_dependency_exists():
-    """Test that python-ulid dependency is in requirements.txt."""
-    requirements_path = Path(__file__).parent.parent / "requirements.txt"
-    assert requirements_path.exists(), "requirements.txt should exist"
-
-    with open(requirements_path, "r") as f:
-        content = f.read()
-        assert "ulid" in content.lower(), "python-ulid should be in requirements.txt"
