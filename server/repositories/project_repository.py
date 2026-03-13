@@ -1,6 +1,6 @@
 """Project repository for database operations."""
 
-from typing import List
+from typing import List, Optional
 
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,6 +16,11 @@ class ProjectRepository(BaseRepository[Project]):
     
     Attributes:
         model: The Project model class.
+    
+    Example:
+        async with async_session() as session:
+            repo = ProjectRepository(session)
+            projects = await repo.list(offset=0, limit=10)
     """
     
     def __init__(self, session: AsyncSession):
@@ -27,46 +32,76 @@ class ProjectRepository(BaseRepository[Project]):
         super().__init__(session)
         self.model = Project
     
-    async def get_by_owner(self, owner_id: int) -> List[Project]:
-        """Get all projects owned by a specific user.
+    async def get_by_unique_id(self, project_unique_id: str) -> Optional[Project]:
+        """Get a project by its unique identifier.
         
         Args:
-            owner_id: User ID who owns the projects.
+            project_unique_id: The unique identifier of the project.
             
         Returns:
-            List of projects owned by the user.
+            Project instance if found, None otherwise.
         """
         result = await self.session.execute(
-            select(Project).where(Project.owner_id == owner_id)
+            select(Project).where(Project.project_unique_id == project_unique_id)
         )
-        return list(result.scalars().all())
+        return result.scalar_one_or_none()
     
-    async def search_by_name(self, name_query: str) -> List[Project]:
-        """Search projects by name (case-insensitive partial match).
+    async def get_by_name(self, name: str, exact: bool = False) -> List[Project]:
+        """Get projects by name.
         
         Args:
-            name_query: Search string to match against project names.
+            name: The project name to search for.
+            exact: If True, do exact match; if False, do fuzzy/partial match.
             
         Returns:
             List of matching projects.
         """
-        result = await self.session.execute(
-            select(Project).where(
-                func.lower(Project.name).like(f"%{name_query.lower()}%")
+        if exact:
+            result = await self.session.execute(
+                select(Project).where(Project.name == name)
             )
-        )
+        else:
+            result = await self.session.execute(
+                select(Project).where(
+                    func.lower(Project.name).like(f"%{name.lower()}%")
+                )
+            )
         return list(result.scalars().all())
     
-    async def count_projects_by_owner(self, owner_id: int) -> int:
-        """Count total projects for a specific owner.
+    async def list(
+        self,
+        offset: int = 0,
+        limit: int = 100,
+        name: Optional[str] = None,
+    ) -> List[Project]:
+        """List projects with pagination and optional name filter.
         
         Args:
-            owner_id: User ID to count projects for.
+            offset: Offset for pagination (default: 0).
+            limit: Maximum number of results (default: 100).
+            name: Optional name filter (fuzzy match, case-insensitive).
             
         Returns:
-            Number of projects owned by the user.
+            List of projects matching the criteria.
         """
-        result = await self.session.execute(
-            select(Project).where(Project.owner_id == owner_id)
-        )
-        return len(result.scalars().all())
+        query = select(Project)
+        
+        # Apply name filter if provided (fuzzy match)
+        if name:
+            query = query.where(
+                func.lower(Project.name).like(f"%{name.lower()}%")
+            )
+        
+        # Apply pagination
+        query = query.offset(offset).limit(limit)
+        
+        result = await self.session.execute(query)
+        return list(result.scalars().all())
+    
+    # Inherited methods from BaseRepository:
+    # - get_by_id(id: int) -> Optional[Project]
+    # - create(**kwargs) -> Project
+    # - update(instance: Project, **kwargs) -> Project
+    # - delete(instance: Project) -> None
+    # - count(**filters) -> int
+    # - exists(id: int) -> bool
