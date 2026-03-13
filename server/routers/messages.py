@@ -1,6 +1,7 @@
 """Message API endpoints with AI integration."""
 
 import json
+import os
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
@@ -13,6 +14,29 @@ from claude_client import ClaudeClientConfig
 
 
 router = APIRouter(prefix="/messages", tags=["messages"])
+
+
+def get_valid_cwd(cwd: Optional[str]) -> str:
+    """Validate cwd and return a valid directory path.
+    
+    If the provided cwd doesn't exist or is empty, falls back to:
+    1. Server's current working directory
+    2. /tmp as last resort
+    
+    Args:
+        cwd: The requested working directory.
+        
+    Returns:
+        A valid directory path that exists on the filesystem.
+    """
+    if cwd and os.path.isdir(cwd):
+        return cwd
+    
+    fallback = os.getcwd()
+    if os.path.isdir(fallback):
+        return fallback
+    
+    return "/tmp"
 
 
 class MessageCreate(BaseModel):
@@ -131,8 +155,10 @@ async def send_ai_prompt(
     """
     service = MessageService(db)
     
+    valid_cwd = get_valid_cwd(request.cwd)
+    
     client_config = ClaudeClientConfig(
-        cwd=request.cwd,
+        cwd=valid_cwd,
         settings=request.settings,
         system_prompt=request.system_prompt
     )

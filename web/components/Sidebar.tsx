@@ -50,6 +50,7 @@ export function Sidebar() {
     if (!selectedWorkspace || !selectedProject) return;
 
     const externalSessionId = uuidv7();
+    const directory = selectedProject.worktree || selectedWorkspace.directory || "";
 
     try {
       const newSession = await createSession.mutateAsync({
@@ -57,7 +58,7 @@ export function Sidebar() {
         external_session_id: externalSessionId,
         project_unique_id: selectedProject.project_unique_id,
         workspace_unique_id: selectedWorkspace.workspace_unique_id,
-        directory: selectedProject.worktree,
+        directory: directory,
         title: "New Chat",
       });
       setSelectedSession(newSession);
