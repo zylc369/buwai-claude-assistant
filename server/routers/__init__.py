@@ -1,13 +1,19 @@
 """API router module."""
 
-from .users import router as users_router
-from .sessions import router as sessions_router
-from .projects import router as projects_router
-from .tasks import router as tasks_router
+# Import actual routers (using file extensions to match actual files)
+from . import projects as projects_router
+from . import workspaces as workspaces_router
+from . import sessions as sessions_router
+from . import messages as messages_router
+
+# Check if events router exists
+import os
+_events_router_exists = os.path.exists("server/routers/events.py")
 
 __all__ = [
-    "users_router",
-    "sessions_router",
     "projects_router",
-    "tasks_router"
+    "workspaces_router",
+    "sessions_router",
+    "messages_router",
+    *(["events_router"] if _events_router_exists else [])
 ]

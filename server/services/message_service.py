@@ -2,6 +2,7 @@
 
 import time
 import json
+import uuid
 from typing import List, Optional, Dict, Any, AsyncIterator
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -114,6 +115,37 @@ class MessageService:
             limit=limit
         )
     
+    def _extract_response_text(self, chunks: List[Any]) -> str:
+        """Extract text content from AI response chunks.
+        
+        Args:
+            chunks: List of response chunk objects from Claude API.
+            
+        Returns:
+            Extracted text content as a string.
+        """
+        text_parts = []
+        
+        for chunk in chunks:
+            if hasattr(chunk, 'content'):
+                content = chunk.content
+                if isinstance(content, list):
+                    for item in content:
+                        if hasattr(item, 'text'):
+                            text_parts.append(item.text)
+                        elif hasattr(item, 'thinking'):
+                            text_parts.append(f"[Thinking: {item.thinking}]")
+                elif isinstance(content, str):
+                    text_parts.append(content)
+            elif hasattr(chunk, 'text'):
+                text_parts.append(chunk.text)
+            elif hasattr(chunk, 'result'):
+                text_parts.append(chunk.result)
+            elif isinstance(chunk, str):
+                text_parts.append(chunk)
+        
+        return "".join(text_parts)
+    
     async def send_ai_prompt(
         self,
         prompt: str,
@@ -125,6 +157,7 @@ class MessageService:
         
         Integrates with ClaudeClient to send prompts and receive streaming
         AI responses. Uses connection pooling if a pool is provided.
+        Persists both user message and AI response to database.
         
         Args:
             prompt: The user prompt to send to AI.
@@ -138,21 +171,47 @@ class MessageService:
         Raises:
             RuntimeError: If client connection fails.
         """
+        current_time = int(time.time())
+        
+        user_msg_id = f"user-{uuid.uuid4()}"
+        await self.message_repo.create(
+            message_unique_id=user_msg_id,
+            session_unique_id=session_unique_id,
+            time_created=current_time,
+            time_updated=current_time,
+            data={"role": "user", "content": prompt}
+        )
+        await self.session.commit()
+        
+        ai_chunks = []
+        
         if pool is not None:
-            # Use connection pool for client reuse
             client = await pool.get_client(session_unique_id, client_config)
             try:
                 await client.query(prompt, session_unique_id)
                 async for response in await client.receive_response():
+                    ai_chunks.append(response)
                     yield response
             finally:
                 await pool.release_client(session_unique_id)
         else:
-            # Create a fresh client connection
             async with ClaudeClient(client_config) as client:
                 await client.query(prompt, session_unique_id)
                 async for response in await client.receive_response():
+                    ai_chunks.append(response)
                     yield response
+        
+        ai_msg_id = f"assistant-{uuid.uuid4()}"
+        ai_response_text = self._extract_response_text(ai_chunks)
+        
+        await self.message_repo.create(
+            message_unique_id=ai_msg_id,
+            session_unique_id=session_unique_id,
+            time_created=current_time,
+            time_updated=current_time,
+            data={"role": "assistant", "content": ai_response_text}
+        )
+        await self.session.commit()
     
     async def count_messages(self, session_unique_id: str) -> int:
         """Count messages for a specific session.

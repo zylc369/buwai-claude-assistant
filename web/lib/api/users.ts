@@ -2,7 +2,7 @@
  * Users API client
  */
 
-import { api, ApiResponse, ApiError } from './client';
+import { api } from './client';
 import { User, CreateUserRequest, UpdateUserRequest } from './types';
 
 export const usersApi = {

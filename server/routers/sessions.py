@@ -1,26 +1,42 @@
-"""Session API endpoints."""
+"""Conversation Session API endpoints."""
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db_session
-from services import SessionService
+from services import ConversationSessionService
 
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
 
 class SessionCreate(BaseModel):
-    user_id: int
-    expires_in_hours: int = 24
+    session_unique_id: str
+    project_unique_id: str
+    workspace_unique_id: str
+    directory: str
+    title: str
+
+
+class SessionUpdate(BaseModel):
+    title: Optional[str] = None
+    directory: Optional[str] = None
+    time_compacting: Optional[int] = None
 
 
 class SessionResponse(BaseModel):
     id: int
-    user_id: int
-    token: str
-    expires_at: str
+    session_unique_id: str
+    project_unique_id: str
+    workspace_unique_id: str
+    directory: str
+    title: str
+    time_created: int
+    time_updated: int
+    time_compacting: Optional[int] = None
+    time_archived: Optional[int] = None
     
     class Config:
         from_attributes = True
@@ -29,34 +45,102 @@ class SessionResponse(BaseModel):
 @router.post("/", response_model=SessionResponse, status_code=201)
 async def create_session(
     session_data: SessionCreate,
-    request: Request,
     db: AsyncSession = Depends(get_db_session)
 ):
-    """Create a new session."""
-    service = SessionService(db)
-    
+    """Create a new conversation session."""
+    service = ConversationSessionService(db)
     session = await service.create_session(
-        user_id=session_data.user_id,
-        expires_in_hours=session_data.expires_in_hours,
-        ip_address=request.client.host if request.client else None,
-        user_agent=request.headers.get("user-agent")
+        session_unique_id=session_data.session_unique_id,
+        project_unique_id=session_data.project_unique_id,
+        workspace_unique_id=session_data.workspace_unique_id,
+        directory=session_data.directory,
+        title=session_data.title,
     )
-    
-    return {
-        "id": session.id,
-        "user_id": session.user_id,
-        "token": session.token,
-        "expires_at": str(session.expires_at)
-    }
+    return session
 
 
-@router.delete("/{token}", status_code=204)
-async def end_session(
-    token: str,
+@router.get("/", response_model=List[SessionResponse])
+async def list_sessions(
+    project_unique_id: str,
+    workspace_unique_id: str,
+    offset: int = 0,
+    limit: int = 100,
+    include_archived: bool = False,
     db: AsyncSession = Depends(get_db_session)
 ):
-    """End a session."""
-    service = SessionService(db)
-    ended = await service.end_session(token)
-    if not ended:
+    """Get sessions filtered by project and workspace (excludes archived by default)."""
+    service = ConversationSessionService(db)
+    sessions = await service.list_sessions(
+        project_unique_id=project_unique_id,
+        workspace_unique_id=workspace_unique_id,
+        offset=offset,
+        limit=limit,
+        include_archived=include_archived,
+    )
+    return sessions
+
+
+@router.get("/{session_unique_id}", response_model=SessionResponse)
+async def get_session(
+    session_unique_id: str,
+    db: AsyncSession = Depends(get_db_session)
+):
+    """Get a specific session by unique ID."""
+    service = ConversationSessionService(db)
+    session = await service.get_by_unique_id(session_unique_id)
+    if not session:
         raise HTTPException(status_code=404, detail="Session not found")
+    return session
+
+
+@router.put("/{session_unique_id}", response_model=SessionResponse)
+async def update_session(
+    session_unique_id: str,
+    session_data: SessionUpdate,
+    db: AsyncSession = Depends(get_db_session)
+):
+    """Update a session."""
+    service = ConversationSessionService(db)
+    update_data = {k: v for k, v in session_data.model_dump().items() if v is not None}
+    session = await service.update_session(session_unique_id, **update_data)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return session
+
+
+@router.delete("/{session_unique_id}", status_code=204)
+async def delete_session(
+    session_unique_id: str,
+    db: AsyncSession = Depends(get_db_session)
+):
+    """Delete a session (cascades to messages)."""
+    service = ConversationSessionService(db)
+    deleted = await service.delete_session(session_unique_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+
+@router.post("/{session_unique_id}/archive", response_model=SessionResponse)
+async def archive_session(
+    session_unique_id: str,
+    db: AsyncSession = Depends(get_db_session)
+):
+    """Archive a session."""
+    service = ConversationSessionService(db)
+    session = await service.archive_session(session_unique_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return session
+
+
+@router.post("/{session_unique_id}/unarchive", response_model=SessionResponse)
+async def unarchive_session(
+    session_unique_id: str,
+    db: AsyncSession = Depends(get_db_session)
+):
+    """Unarchive a session."""
+    service = ConversationSessionService(db)
+    session = await service.unarchive_session(session_unique_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return session

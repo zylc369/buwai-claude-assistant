@@ -167,6 +167,47 @@ export interface SSEEvent {
 }
 
 // ============================================
+// SSE Connection State types
+// ============================================
+
+export type SSEConnectionState = 
+  | 'connecting'
+  | 'connected'
+  | 'receiving'
+  | 'idle'
+  | 'disconnected'
+  | 'error';
+
+export interface SSEState {
+  connectionState: SSEConnectionState;
+  lastError?: string;
+  reconnectAttempts: number;
+}
+
+// ============================================
+// Session Execution State types
+// ============================================
+
+export type SessionExecutionStatus = 'idle' | 'executing';
+
+export interface SessionExecutionState {
+  session_unique_id: string;
+  status: SessionExecutionStatus;
+  lastMessage?: string;
+  lastMessageTime?: number;
+}
+
+// ============================================
+// LocalStorage Persistence types
+// ============================================
+
+export interface PersistedState {
+  project_unique_id?: string;
+  workspace_unique_id?: string;
+  session_unique_id?: string;
+}
+
+// ============================================
 // Legacy types (for backward compatibility)
 // ============================================
 

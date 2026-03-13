@@ -5,7 +5,7 @@
 type EventHandler = (event: any) => void;
 
 export class SSEClient {
-  private eventSource: EventSource | null;
+  private eventSource: EventSource | null = null;
   private handlers: Map<string, EventHandler[]> = new Map();
   
   connect(url: string = 'http://localhost:8000/events/stream') {

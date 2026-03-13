@@ -6,9 +6,10 @@ import { api } from './client';
 import { Project, CreateProjectRequest, UpdateProjectRequest } from './types';
 
 export const projectsApi = {
-  list: (ownerId?: number) => api.get<Project[]>('/projects/', {
-      params: ownerId ? { owner_id: ownerId } : undefined 
-    }),
+  list: (ownerId?: number) => {
+    const url = ownerId ? `/projects/?owner_id=${ownerId}` : '/projects/';
+    return api.get<Project[]>(url);
+  },
   
   get: (id: number) => api.get<Project>(`/projects/${id}`),
   

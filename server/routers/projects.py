@@ -1,8 +1,8 @@
 """Project API endpoints."""
 
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db_session
@@ -12,22 +12,34 @@ from services import ProjectService
 router = APIRouter(prefix="/projects", tags=["projects"])
 
 
+# Request/Response Models
 class ProjectCreate(BaseModel):
-    name: str
-    owner_id: int
-    description: str | None = None
+    """Schema for creating a project."""
+    project_unique_id: str = Field(..., description="Unique identifier for the project")
+    worktree: str = Field(..., description="Path to the worktree directory")
+    name: Optional[str] = Field(None, description="Optional project name")
+    branch: Optional[str] = Field(None, description="Optional git branch name")
+    time_initialized: Optional[int] = Field(None, description="Optional initialization timestamp")
 
 
 class ProjectUpdate(BaseModel):
-    name: str | None = None
-    description: str | None = None
+    """Schema for updating a project."""
+    worktree: Optional[str] = Field(None, description="Path to the worktree directory")
+    name: Optional[str] = Field(None, description="Project name")
+    branch: Optional[str] = Field(None, description="Git branch name")
+    time_initialized: Optional[int] = Field(None, description="Initialization timestamp")
 
 
 class ProjectResponse(BaseModel):
+    """Schema for project response."""
     id: int
-    name: str
-    description: str | None
-    owner_id: int
+    project_unique_id: str
+    worktree: str
+    branch: Optional[str]
+    name: Optional[str]
+    time_initialized: Optional[int]
+    time_created: int
+    time_updated: int
     
     class Config:
         from_attributes = True
@@ -38,67 +50,154 @@ async def create_project(
     project_data: ProjectCreate,
     db: AsyncSession = Depends(get_db_session)
 ):
-    """Create a new project."""
+    """Create a new project.
+    
+    Args:
+        project_data: Project creation data.
+        
+    Returns:
+        Created project.
+        
+    Raises:
+        HTTPException: 400 if project_unique_id already exists.
+    """
     service = ProjectService(db)
-    project = await service.create_project(
-        name=project_data.name,
-        owner_id=project_data.owner_id,
-        description=project_data.description
-    )
-    return project
+    
+    existing = await service.get_project_by_unique_id(project_data.project_unique_id)
+    if existing:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Project with unique_id '{project_data.project_unique_id}' already exists"
+        )
+    
+    try:
+        project = await service.create_project(
+            project_unique_id=project_data.project_unique_id,
+            worktree=project_data.worktree,
+            name=project_data.name,
+            branch=project_data.branch,
+            time_initialized=project_data.time_initialized,
+        )
+        return project
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/", response_model=List[ProjectResponse])
 async def list_projects(
-    owner_id: int | None = None,
+    offset: int = Query(0, ge=0, description="Offset for pagination"),
+    limit: int = Query(100, ge=1, le=1000, description="Maximum number of results"),
+    name: Optional[str] = Query(None, description="Filter by name (fuzzy match, case-insensitive)"),
     db: AsyncSession = Depends(get_db_session)
 ):
-    """Get all projects or filter by owner."""
+    """List projects with pagination and optional name filter.
+    
+    Args:
+        offset: Offset for pagination.
+        limit: Maximum number of results.
+        name: Optional name filter (fuzzy match, case-insensitive).
+        
+    Returns:
+        List of projects matching the criteria.
+    """
     service = ProjectService(db)
-    if owner_id:
-        projects = await service.get_user_projects(owner_id)
-    else:
-        # For now, return empty list if no filter
-        # In production, you'd want admin-only access to all projects
-        projects = []
+    projects = await service.list_projects(
+        offset=offset,
+        limit=limit,
+        name=name,
+    )
     return projects
 
 
-@router.get("/{project_id}", response_model=ProjectResponse)
+@router.get("/{project_unique_id}", response_model=ProjectResponse)
 async def get_project(
-    project_id: int,
+    project_unique_id: str,
     db: AsyncSession = Depends(get_db_session)
 ):
-    """Get a specific project."""
+    """Get a specific project by unique ID.
+    
+    Args:
+        project_unique_id: The project's unique identifier.
+        
+    Returns:
+        Project data.
+        
+    Raises:
+        HTTPException: 404 if project not found.
+    """
     service = ProjectService(db)
-    project = await service.get_project(project_id)
+    project = await service.get_project_by_unique_id(project_unique_id)
+    
     if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(
+            status_code=404,
+            detail=f"Project '{project_unique_id}' not found"
+        )
+    
     return project
 
 
-@router.put("/{project_id}", response_model=ProjectResponse)
+@router.put("/{project_unique_id}", response_model=ProjectResponse)
 async def update_project(
-    project_id: int,
+    project_unique_id: str,
     project_data: ProjectUpdate,
     db: AsyncSession = Depends(get_db_session)
 ):
-    """Update a project."""
+    """Update a project.
+    
+    Args:
+        project_unique_id: The project's unique identifier.
+        project_data: Fields to update.
+        
+    Returns:
+        Updated project.
+        
+    Raises:
+        HTTPException: 404 if project not found.
+    """
     service = ProjectService(db)
-    update_data = {k: v for k, v in project_data.dict().items() if v is not None}
-    project = await service.update_project(project_id, **update_data)
+    
+    project = await service.get_project_by_unique_id(project_unique_id)
     if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    return project
+        raise HTTPException(
+            status_code=404,
+            detail=f"Project '{project_unique_id}' not found"
+        )
+    
+    update_data = {k: v for k, v in project_data.model_dump().items() if v is not None}
+    
+    if not update_data:
+        return project
+    
+    updated = await service.update_project(project.id, **update_data)
+    return updated
 
 
-@router.delete("/{project_id}", status_code=204)
+@router.delete("/{project_unique_id}", status_code=204)
 async def delete_project(
-    project_id: int,
+    project_unique_id: str,
     db: AsyncSession = Depends(get_db_session)
 ):
-    """Delete a project."""
+    """Delete a project (cascades to workspaces, sessions, messages).
+    
+    Args:
+        project_unique_id: The project's unique identifier.
+        
+    Raises:
+        HTTPException: 404 if project not found.
+    """
     service = ProjectService(db)
-    deleted = await service.delete_project(project_id)
+    
+    project = await service.get_project_by_unique_id(project_unique_id)
+    if not project:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Project '{project_unique_id}' not found"
+        )
+    
+    deleted = await service.delete_project(project.id)
     if not deleted:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to delete project"
+        )

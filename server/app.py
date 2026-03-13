@@ -5,13 +5,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from database import init_db
-from routers import (
-    users_router,
-    sessions_router,
-    projects_router,
-    tasks_router
-)
-from routers.events import router as events_router
+from routers.projects import router as projects_router
+from routers.sessions import router as sessions_router
+from routers.workspaces import router as workspaces_router
+from routers.messages import router as messages_router
+try:
+    from routers.events import router as events_router
+except ImportError:
+    events_router = None
 
 
 @asynccontextmanager
@@ -42,11 +43,12 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(users_router)
-app.include_router(sessions_router)
 app.include_router(projects_router)
-app.include_router(tasks_router)
-app.include_router(events_router)
+app.include_router(sessions_router)
+app.include_router(workspaces_router)
+app.include_router(messages_router)
+if events_router:
+    app.include_router(events_router)
 
 
 @app.get("/")

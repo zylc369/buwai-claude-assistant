@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback, KeyboardEvent } from "react";
+import { useState, useRef, useCallback, KeyboardEvent, useEffect } from "react";
 import { useSessionStore } from "@/lib/stores/useSessionStore";
 import { apiClient } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
@@ -16,7 +16,23 @@ export function InputArea({ onStreamingContent, onStreamEnd }: InputAreaProps) {
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const { selectedSession } = useSessionStore();
+
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+    };
+  }, [selectedSession?.session_unique_id]);
 
   const isDisabled = !selectedSession || isSending || !input.trim();
 
@@ -27,13 +43,18 @@ export function InputArea({ onStreamingContent, onStreamEnd }: InputAreaProps) {
     setInput("");
     setIsSending(true);
 
+    abortControllerRef.current = new AbortController();
+
     try {
-      const generator = apiClient.streamAIResponse({
-        prompt,
-        session_unique_id: selectedSession!.session_unique_id,
-        cwd: selectedSession!.directory,
-        settings: "",
-      });
+      const generator = apiClient.streamAIResponse(
+        {
+          prompt,
+          session_unique_id: selectedSession!.session_unique_id,
+          cwd: selectedSession!.directory,
+          settings: "",
+        },
+        abortControllerRef.current.signal
+      );
 
       let accumulatedContent = "";
 
@@ -52,10 +73,15 @@ export function InputArea({ onStreamingContent, onStreamEnd }: InputAreaProps) {
         }
       }
     } catch (error) {
-      console.error("Failed to send message:", error);
-      onStreamEnd?.();
+      if (error instanceof Error && error.name === "AbortError") {
+        onStreamEnd?.();
+      } else {
+        console.error("Failed to send message:", error);
+        onStreamEnd?.();
+      }
     } finally {
       setIsSending(false);
+      abortControllerRef.current = null;
     }
   }, [input, isDisabled, selectedSession, onStreamingContent, onStreamEnd]);
 
@@ -85,7 +111,7 @@ export function InputArea({ onStreamingContent, onStreamEnd }: InputAreaProps) {
             onKeyDown={handleKeyDown}
             placeholder={
               selectedSession
-                ? "Type a message... (Enter to send, Shift+Enter for newline)"
+                ? "Type a message... (Enter to send, ⌘/Shift+Enter for newline)"
                 : "Select a session to start chatting"
             }
             disabled={!selectedSession || isSending}
@@ -112,7 +138,7 @@ export function InputArea({ onStreamingContent, onStreamEnd }: InputAreaProps) {
       </div>
       <div className="mt-2 text-xs text-muted-foreground text-center">
         Press <kbd className="px-1.5 py-0.5 rounded bg-muted font-mono text-[10px]">Enter</kbd> to send,{" "}
-        <kbd className="px-1.5 py-0.5 rounded bg-muted font-mono text-[10px]">Shift+Enter</kbd> for newline
+        <kbd className="px-1.5 py-0.5 rounded bg-muted font-mono text-[10px]">⌘/Shift+Enter</kbd> for newline
       </div>
     </div>
   );

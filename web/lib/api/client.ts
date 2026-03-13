@@ -16,9 +16,18 @@ import type {
   ListMessagesParams,
   AISendRequest,
   SSEEvent,
+  SSEConnectionState,
+  SSEState,
+  SessionExecutionState,
+  PersistedState,
 } from './types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+const STORAGE_KEYS = {
+  SESSION_EXECUTION_STATE: 'buwai-session-execution-state',
+  PERSISTED_IDS: 'buwai-persisted-ids',
+} as const;
 
 export interface ApiError {
   detail: string;
@@ -205,7 +214,7 @@ export class APIClient {
   // AI Send method (streaming)
   // ============================================
   
-  async sendAIPrompt(request: AISendRequest): Promise<Response> {
+  async sendAIPrompt(request: AISendRequest, signal?: AbortSignal): Promise<Response> {
     const url = `${API_BASE_URL}/messages/send`;
     
     const response = await fetch(url, {
@@ -214,6 +223,7 @@ export class APIClient {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(request),
+      signal,
     });
     
     if (!response.ok) {
@@ -224,8 +234,8 @@ export class APIClient {
     return response;
   }
   
-  async *streamAIResponse(request: AISendRequest): AsyncGenerator<SSEEvent> {
-    const response = await this.sendAIPrompt(request);
+  async *streamAIResponse(request: AISendRequest, signal?: AbortSignal): AsyncGenerator<SSEEvent> {
+    const response = await this.sendAIPrompt(request, signal);
     const reader = response.body?.getReader();
     
     if (!reader) {
@@ -261,6 +271,158 @@ export class APIClient {
         }
       }
     }
+  }
+
+  // ============================================
+  // SSE Connection methods
+  // ============================================
+
+  connectSSE(endpoint: string, onMessage: (event: SSEEvent) => void, onError?: (error: Error) => void): () => void {
+    const url = `${API_BASE_URL}${endpoint}`;
+    const eventSource = new EventSource(url);
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data) as SSEEvent;
+        onMessage(data);
+      } catch {
+        // Skip malformed JSON
+      }
+    };
+
+    eventSource.onerror = () => {
+      const error = new Error('SSE connection error');
+      onError?.(error);
+      eventSource.close();
+    };
+
+    return () => {
+      eventSource.close();
+    };
+  }
+
+  createSSEConnection(
+    endpoint: string,
+    handlers: {
+      onMessage?: (event: SSEEvent) => void;
+      onError?: (error: Error) => void;
+      onOpen?: () => void;
+    }
+  ): () => void {
+    const url = `${API_BASE_URL}${endpoint}`;
+    const eventSource = new EventSource(url);
+
+    eventSource.onopen = () => {
+      handlers.onOpen?.();
+    };
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data) as SSEEvent;
+        handlers.onMessage?.(data);
+      } catch {
+        // Skip malformed JSON
+      }
+    };
+
+    eventSource.onerror = () => {
+      const error = new Error('SSE connection error');
+      handlers.onError?.(error);
+      eventSource.close();
+    };
+
+    return () => {
+      eventSource.close();
+    };
+  }
+
+  // ============================================
+  // Session Execution State methods
+  // ============================================
+
+  getSessionState(sessionUniqueId: string): SessionExecutionState | null {
+    if (typeof window === 'undefined') return null;
+    
+    const stored = localStorage.getItem(STORAGE_KEYS.SESSION_EXECUTION_STATE);
+    if (!stored) return null;
+    
+    try {
+      const states = JSON.parse(stored) as Record<string, SessionExecutionState>;
+      return states[sessionUniqueId] || null;
+    } catch {
+      return null;
+    }
+  }
+
+  saveSessionState(state: SessionExecutionState): void {
+    if (typeof window === 'undefined') return;
+    
+    const stored = localStorage.getItem(STORAGE_KEYS.SESSION_EXECUTION_STATE);
+    let states: Record<string, SessionExecutionState> = {};
+    
+    try {
+      states = stored ? JSON.parse(stored) : {};
+    } catch {
+      states = {};
+    }
+    
+    states[state.session_unique_id] = state;
+    localStorage.setItem(STORAGE_KEYS.SESSION_EXECUTION_STATE, JSON.stringify(states));
+  }
+
+  loadSessionState(): Record<string, SessionExecutionState> {
+    if (typeof window === 'undefined') return {};
+    
+    const stored = localStorage.getItem(STORAGE_KEYS.SESSION_EXECUTION_STATE);
+    if (!stored) return {};
+    
+    try {
+      return JSON.parse(stored) as Record<string, SessionExecutionState>;
+    } catch {
+      return {};
+    }
+  }
+
+  clearSessionState(sessionUniqueId: string): void {
+    if (typeof window === 'undefined') return;
+    
+    const stored = localStorage.getItem(STORAGE_KEYS.SESSION_EXECUTION_STATE);
+    if (!stored) return;
+    
+    try {
+      const states = JSON.parse(stored) as Record<string, SessionExecutionState>;
+      delete states[sessionUniqueId];
+      localStorage.setItem(STORAGE_KEYS.SESSION_EXECUTION_STATE, JSON.stringify(states));
+    } catch {
+      // Ignore parsing errors
+    }
+  }
+
+  // ============================================
+  // Persistence methods (project/workspace/session IDs)
+  // ============================================
+
+  savePersistedIds(state: PersistedState): void {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem(STORAGE_KEYS.PERSISTED_IDS, JSON.stringify(state));
+  }
+
+  loadPersistedIds(): PersistedState {
+    if (typeof window === 'undefined') return {};
+    
+    const stored = localStorage.getItem(STORAGE_KEYS.PERSISTED_IDS);
+    if (!stored) return {};
+    
+    try {
+      return JSON.parse(stored) as PersistedState;
+    } catch {
+      return {};
+    }
+  }
+
+  clearPersistedIds(): void {
+    if (typeof window === 'undefined') return;
+    localStorage.removeItem(STORAGE_KEYS.PERSISTED_IDS);
   }
 }
 
