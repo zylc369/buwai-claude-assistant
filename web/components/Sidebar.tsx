@@ -6,91 +6,51 @@ import { Plus, MessageSquare, FolderOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useWorkspaceStore, useSessionStore, useProjectStore } from "@/lib/store";
+import { useWorkspaces, useCreateWorkspace } from "@/hooks/useWorkspaces";
 import { cn } from "@/lib/utils";
-import type { Workspace, Session } from "@/lib/api/types";
-
-// Placeholder data - will be replaced with hooks when API is ready
-const mockWorkspaces: Workspace[] = [
-  {
-    id: 1,
-    workspace_unique_id: "ws-1",
-    project_unique_id: "proj-1",
-    name: "Development",
-    branch: "main",
-    directory: "/workspace/dev",
-    extra: null,
-  },
-  {
-    id: 2,
-    workspace_unique_id: "ws-2",
-    project_unique_id: "proj-1",
-    name: "Feature Branch",
-    branch: "feature/new-ui",
-    directory: "/workspace/feature",
-    extra: null,
-  },
-];
-
-const mockSessions: Session[] = [
-  {
-    id: 1,
-    session_unique_id: "sess-1",
-    project_unique_id: "proj-1",
-    workspace_unique_id: "ws-1",
-    directory: "/workspace/dev",
-    title: "Initial Setup",
-    time_created: Date.now() - 86400000,
-    time_updated: Date.now() - 3600000,
-    time_compacting: null,
-    time_archived: null,
-  },
-  {
-    id: 2,
-    session_unique_id: "sess-2",
-    project_unique_id: "proj-1",
-    workspace_unique_id: "ws-1",
-    directory: "/workspace/dev",
-    title: "Bug Fixes",
-    time_created: Date.now() - 172800000,
-    time_updated: Date.now() - 7200000,
-    time_compacting: null,
-    time_archived: null,
-  },
-];
+import type { Session } from "@/lib/api/types";
 
 export function Sidebar() {
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isCreateWorkspaceDialogOpen, setIsCreateWorkspaceDialogOpen] = useState(false);
+  const [isCreateSessionDialogOpen, setIsCreateSessionDialogOpen] = useState(false);
+  const [newWorkspaceName, setNewWorkspaceName] = useState("");
+  const [newWorkspaceBranch, setNewWorkspaceBranch] = useState("");
   const [newSessionTitle, setNewSessionTitle] = useState("");
 
   const { selectedWorkspace, setSelectedWorkspace } = useWorkspaceStore();
   const { selectedSession, setSelectedSession } = useSessionStore();
   const { selectedProject } = useProjectStore();
 
-  // TODO: Replace with actual hooks when API is ready
-  // const { data: workspaces = [] } = useWorkspaces(selectedProject?.project_unique_id);
-  // const { data: sessions = [] } = useSessions(selectedProject?.project_unique_id, selectedWorkspace?.workspace_unique_id);
-  // const createSession = useCreateSession();
+  const { data: workspaces = [], isLoading: workspacesLoading } = useWorkspaces(selectedProject?.project_unique_id);
+  const createWorkspace = useCreateWorkspace();
 
-  const workspaces = selectedProject ? mockWorkspaces : [];
-  const sessions = selectedWorkspace
-    ? mockSessions.filter((s) => s.workspace_unique_id === selectedWorkspace.workspace_unique_id)
-    : [];
+  const sessions: Session[] = [];
+
+  const handleCreateWorkspace = async () => {
+    if (!newWorkspaceName.trim() || !selectedProject) return;
+
+    try {
+      await createWorkspace.mutateAsync({
+        workspace_unique_id: crypto.randomUUID(),
+        project_unique_id: selectedProject.project_unique_id,
+        name: newWorkspaceName.trim(),
+        branch: newWorkspaceBranch.trim() || undefined,
+        directory: selectedProject.worktree,
+      });
+      setIsCreateWorkspaceDialogOpen(false);
+      setNewWorkspaceName("");
+      setNewWorkspaceBranch("");
+    } catch (error) {
+      console.error("Failed to create workspace:", error);
+    }
+  };
 
   const handleCreateSession = async () => {
     if (!newSessionTitle.trim() || !selectedWorkspace || !selectedProject) return;
 
     try {
-      // TODO: Call create session API
-      // await createSession.mutateAsync({
-      //   session_unique_id: crypto.randomUUID(),
-      //   project_unique_id: selectedProject.project_unique_id,
-      //   workspace_unique_id: selectedWorkspace.workspace_unique_id,
-      //   directory: selectedWorkspace.directory || "",
-      //   title: newSessionTitle.trim(),
-      // });
-
       console.log("Create session:", newSessionTitle);
-      setIsCreateDialogOpen(false);
+      setIsCreateSessionDialogOpen(false);
       setNewSessionTitle("");
     } catch (error) {
       console.error("Failed to create session:", error);
@@ -112,15 +72,29 @@ export function Sidebar() {
   return (
     <aside className="w-64 border-r border-border bg-muted/30 flex flex-col h-full">
       <div className="border-b border-border">
-        <div className="px-3 py-2">
+        <div className="px-3 py-2 flex items-center justify-between">
           <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
             Workspaces
           </h3>
+          {selectedProject && (
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              onClick={() => setIsCreateWorkspaceDialogOpen(true)}
+              className="h-5 w-5"
+            >
+              <Plus className="size-3" />
+            </Button>
+          )}
         </div>
         <div className="max-h-48 overflow-y-auto px-2 pb-2 space-y-1">
           {!selectedProject ? (
             <div className="px-3 py-2 text-sm text-muted-foreground">
               Select a project first
+            </div>
+          ) : workspacesLoading ? (
+            <div className="px-3 py-2 text-sm text-muted-foreground">
+              Loading...
             </div>
           ) : workspaces.length === 0 ? (
             <div className="px-3 py-2 text-sm text-muted-foreground">
@@ -155,7 +129,7 @@ export function Sidebar() {
             <Button
               variant="ghost"
               size="icon-xs"
-              onClick={() => setIsCreateDialogOpen(true)}
+              onClick={() => setIsCreateSessionDialogOpen(true)}
               className="h-5 w-5"
             >
               <Plus className="size-3" />
@@ -197,7 +171,80 @@ export function Sidebar() {
         </div>
       </div>
 
-      <Dialog.Root open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+      <Dialog.Root open={isCreateWorkspaceDialogOpen} onOpenChange={setIsCreateWorkspaceDialogOpen}>
+        <Dialog.Portal>
+          <Dialog.Backdrop
+            className={cn(
+              "fixed inset-0 bg-black/50 z-50",
+              "animate-in fade-in-0",
+              "data-[state=closed]:animate-out data-[state=closed]:fade-out-0"
+            )}
+          />
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <Dialog.Popup
+              className={cn(
+                "w-full max-w-md rounded-xl border border-border bg-background p-6 shadow-xl",
+                "animate-in fade-in-0 zoom-in-95",
+                "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95"
+              )}
+            >
+              <Dialog.Title className="text-lg font-semibold mb-4">
+                New Workspace
+              </Dialog.Title>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium mb-1.5 block">
+                    Workspace Name
+                  </label>
+                  <Input
+                    value={newWorkspaceName}
+                    onChange={(e) => setNewWorkspaceName(e.target.value)}
+                    placeholder="main"
+                    className="w-full"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium mb-1.5 block">
+                    Branch (optional)
+                  </label>
+                  <Input
+                    value={newWorkspaceBranch}
+                    onChange={(e) => setNewWorkspaceBranch(e.target.value)}
+                    placeholder="main"
+                    className="w-full"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 mt-6">
+                <Button
+                  variant="outline"
+                  onClick={() => setIsCreateWorkspaceDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleCreateWorkspace}
+                  disabled={!newWorkspaceName.trim() || createWorkspace.isPending}
+                >
+                  {createWorkspace.isPending ? "Creating..." : "Create"}
+                </Button>
+              </div>
+
+              <Dialog.Close
+                className="absolute right-4 top-4 rounded-sm opacity-70 hover:opacity-100 cursor-pointer"
+              >
+                <span className="sr-only">Close</span>
+                ×
+              </Dialog.Close>
+            </Dialog.Popup>
+          </div>
+        </Dialog.Portal>
+      </Dialog.Root>
+
+      <Dialog.Root open={isCreateSessionDialogOpen} onOpenChange={setIsCreateSessionDialogOpen}>
         <Dialog.Portal>
           <Dialog.Backdrop
             className={cn(
@@ -241,7 +288,7 @@ export function Sidebar() {
               <div className="flex justify-end gap-2 mt-6">
                 <Button
                   variant="outline"
-                  onClick={() => setIsCreateDialogOpen(false)}
+                  onClick={() => setIsCreateSessionDialogOpen(false)}
                 >
                   Cancel
                 </Button>

@@ -22,7 +22,7 @@ import type {
   PersistedState,
 } from './types';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
 
 const STORAGE_KEYS = {
   SESSION_EXECUTION_STATE: 'buwai-session-execution-state',
@@ -61,7 +61,7 @@ async function fetchApi<T>(
   options?: RequestInit
 ): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
-  
+
   const config: RequestInit = {
     ...options,
     headers: {
@@ -69,9 +69,15 @@ async function fetchApi<T>(
       ...options?.headers,
     },
   };
-  
-  const response = await fetch(url, config);
-  return handleResponse<T>(response);
+
+  try {
+    const response = await fetch(url, config);
+    return handleResponse<T>(response);
+  } catch (error) {
+    console.error('[API] Fetch failed:', error);
+    console.error('[API] URL attempted:', url);
+    throw error;
+  }
 }
 
 const api = {
