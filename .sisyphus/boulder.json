@@ -1,12 +1,13 @@
 {
-  "active_plan": "/Users/aserlili/Documents/Codes/buwai-claude-assistant/.sisyphus/plans/web-server-upgrade.md",
-  "started_at": "2026-03-12T08:44:45.143Z",
-  "current_wave": 2,
+  "active_plan": "/Users/aserlili/Documents/Codes/buwai-claude-assistant/.sisyphus/plans/ai-workspace-rewrite.md",
+  "started_at": "2026-03-13T07:45:00.000Z",
+  "current_wave": 1,
   "wave_status": "in_progress",
   "session_ids": [
-    "ses_31ef98f63ffeVTyN41pt320Y0d"
+    "ses_31a45001cffeao9cNuOY2Y4ab4"
   ],
-  "plan_name": "web-server-upgrade",
+  "plan_name": "ai-workspace-rewrite",
   "agent": "atlas",
-  "last_updated": "2026-03-12T17:30:00.000Z"
+  "worktree_path": "/Users/aserlili/Documents/Codes/buwai-claude-assistant",
+  "last_updated": "2026-03-13T07:45:00.000Z"
 }
