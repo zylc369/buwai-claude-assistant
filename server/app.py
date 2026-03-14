@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from config import get_config
 from database import init_db
 from routers.projects import router as projects_router
 from routers.sessions import router as sessions_router
@@ -25,6 +26,9 @@ async def lifespan(app: FastAPI):
     pass
 
 
+# Load configuration
+config = get_config()
+
 # Create FastAPI application
 app = FastAPI(
     title="Claude Assistant Web Server",
@@ -33,13 +37,13 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Configure CORS
+# Configure CORS from application.yml
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Next.js frontend
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=config.server.cors.origins,
+    allow_credentials=config.server.cors.allow_credentials,
+    allow_methods=config.server.cors.allow_methods,
+    allow_headers=config.server.cors.allow_headers,
 )
 
 # Include routers

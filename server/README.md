@@ -62,7 +62,18 @@ Create `~/.claude/settings.json`:
 # Activate virtual environment first
 source .venv/bin/activate
 
-# Start development server with auto-reload
+# Start server using application.yml config (recommended)
+python run.py
+
+# Or use a specific profile
+APP_PROFILE=dev python run.py
+
+# Or override via environment variables
+SERVER__PORT=9000 python run.py
+```
+
+Alternative (hardcoded, bypasses application.yml):
+```bash
 uvicorn app:app --reload --host 0.0.0.0 --port 8000
 ```
 

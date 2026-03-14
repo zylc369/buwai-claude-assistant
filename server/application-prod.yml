@@ -1,0 +1,8 @@
+# Production profile configuration
+server:
+  host: "0.0.0.0"
+  port: ${SERVER_PORT:8000}
+
+database:
+  url: "${DATABASE_URL}"
+  echo: false

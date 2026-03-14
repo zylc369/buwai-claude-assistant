@@ -1,8 +1,8 @@
 """Database engine and session factory for SQLAlchemy 2.0 async."""
 
-from pathlib import Path
 from typing import AsyncGenerator
 
+from config import get_config
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -10,11 +10,13 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-# Default database path - can be overridden via environment variable or config
-DEFAULT_DATABASE_PATH = Path(__file__).parent.parent / "app.db"
-DATABASE_PATH = Path(__name__).parent.parent / "app.db"
-#VP|
-#HX|# Add code to enable SQLite WAL mode for concurrency support
+
+def _get_database_url() -> str:
+    """Get database URL from configuration."""
+    config = get_config()
+    return config.database.url
+
+
 async def _enable_wal_mode() -> None:
     """Enable SQLite WAL mode for better concurrency support."""
     async with engine.begin() as conn:
@@ -31,10 +33,10 @@ async def init_db() -> None:
 # Create async engine with SQLite configuration
 # NO connection pooling for SQLite (handled by WAL mode for concurrency)
 engine: AsyncEngine = create_async_engine(
-    "sqlite+aiosqlite:///" + str(DATABASE_PATH),
-    echo=False,  # Set to True for SQL logging during development
-    future=True,  # Use SQLAlchemy 2.0 style
-    connect_args={"check_same_thread": False},  # Allow multiple threads
+    _get_database_url(),
+    echo=get_config().database.echo,
+    future=True,
+    connect_args={"check_same_thread": False},
 )
 
 # Create async session factory

@@ -1,0 +1,16 @@
+# Default application configuration
+server:
+  host: "0.0.0.0"
+  port: 8000
+  cors:
+    origins:
+      - "http://localhost:3000"
+    allow_credentials: true
+    allow_methods:
+      - "*"
+    allow_headers:
+      - "*"
+
+database:
+  url: "sqlite+aiosqlite:///app.db"
+  echo: false

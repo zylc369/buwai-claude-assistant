@@ -1,0 +1,11 @@
+# Development profile configuration
+server:
+  port: 8000
+  cors:
+    origins:
+      - "http://localhost:3000"
+      - "http://localhost:5173"
+
+database:
+  url: "sqlite+aiosqlite:///./app.db"
+  echo: true
