@@ -1,5 +1,9 @@
 # OS
 .DS_Store
+._*
 
 /.idea
 __pycache__
+
+# Backup files
+*~
