@@ -120,7 +120,7 @@ export function ChatArea({ messages, isLoading, streamingContent, sdkSessionId }
                         : "text-muted-foreground"
                     )}
                   >
-                    {new Date(message.time_created * 1000).toLocaleTimeString()}
+                    {new Date(message.gmt_create * 1000).toLocaleTimeString()}
                   </p>
                 </div>
               </div>
