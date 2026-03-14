@@ -1,12 +1,12 @@
 """FastAPI application main entry point."""
 
-import uuid
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
 from config import get_config
+from utils.id_generator import generate_uuidv7
 from database import init_db
 from logger import setup_logging, shutdown_logging, set_request_id, reset_request_id, get_logger
 from routers.projects import router as projects_router
@@ -23,7 +23,7 @@ _logger = get_logger(__name__)
 
 class RequestIDMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
-        request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())[:8]
+        request_id = request.headers.get("X-Request-ID") or generate_uuidv7()[:8]
         token = set_request_id(request_id)
         try:
             _logger.info(f"Request started: {request.method} {request.url.path}")

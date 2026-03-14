@@ -78,10 +78,10 @@ async def client(app):
 async def test_project(db_session: AsyncSession):
     project = Project(
         project_unique_id="proj-test-001",
-        worktree="/test/worktree",
+        directory="/test/worktree",
         name="Test Project",
-        time_created=1000,
-        time_updated=1000,
+        gmt_create=1000,
+        gmt_modified=1000,
     )
     db_session.add(project)
     await db_session.commit()
@@ -96,6 +96,8 @@ async def test_workspace(db_session: AsyncSession, test_project: Project):
         project_unique_id=test_project.project_unique_id,
         name="Test Workspace",
         directory="/test/dir",
+        gmt_create=1000,
+        gmt_modified=1000,
     )
     db_session.add(workspace)
     await db_session.commit()
@@ -112,8 +114,8 @@ async def test_conversation_session(db_session: AsyncSession, test_project: Proj
         workspace_unique_id=test_workspace.workspace_unique_id,
         directory="/test/dir",
         title="Test Session",
-        time_created=1000,
-        time_updated=1000,
+        gmt_create=1000,
+        gmt_modified=1000,
     )
     db_session.add(session)
     await db_session.commit()
@@ -170,8 +172,8 @@ class TestCreateSession:
         
         assert response.status_code == 201
         data = response.json()
-        assert data["time_created"] is not None
-        assert data["time_updated"] is not None
+        assert data["gmt_create"] is not None
+        assert data["gmt_modified"] is not None
 
 
 class TestListSessions:
@@ -212,8 +214,8 @@ class TestListSessions:
             workspace_unique_id=test_workspace.workspace_unique_id,
             directory="/test/dir",
             title="Archived Session",
-            time_created=1000,
-            time_updated=1000,
+            gmt_create=1000,
+            gmt_modified=1000,
             time_archived=2000,
         )
         db_session.add(archived_session)
@@ -247,8 +249,8 @@ class TestListSessions:
             workspace_unique_id=test_workspace.workspace_unique_id,
             directory="/test/dir",
             title="Archived Session 2",
-            time_created=1000,
-            time_updated=1000,
+            gmt_create=1000,
+            gmt_modified=1000,
             time_archived=2000,
         )
         db_session.add(archived_session)
@@ -309,21 +311,21 @@ class TestUpdateSession:
         assert data["title"] == "Updated Title"
     
     @pytest.mark.asyncio
-    async def test_update_session_auto_time_updated(
+    async def test_update_session_auto_gmt_modified(
         self,
         client: AsyncClient,
         test_conversation_session: Session
     ):
-        original_time = test_conversation_session.time_updated
-        
+        original_time = test_conversation_session.gmt_modified
+
         response = await client.put(
             f"/sessions/{test_conversation_session.session_unique_id}",
             json={"title": "New Title"}
         )
-        
+
         assert response.status_code == 200
         data = response.json()
-        assert data["time_updated"] >= original_time
+        assert data["gmt_modified"] >= original_time
     
     @pytest.mark.asyncio
     async def test_update_session_not_found(self, client: AsyncClient):
@@ -363,8 +365,8 @@ class TestDeleteSession:
         message = Message(
             message_unique_id="msg-cascade-001",
             session_unique_id=test_conversation_session.session_unique_id,
-            time_created=1000,
-            time_updated=1000,
+            gmt_create=1000,
+            gmt_modified=1000,
             data='{"content": "test"}',
         )
         db_session.add(message)
@@ -422,8 +424,8 @@ class TestUnarchiveSession:
             workspace_unique_id=test_workspace.workspace_unique_id,
             directory="/test/dir",
             title="Archived Session",
-            time_created=1000,
-            time_updated=1000,
+            gmt_create=1000,
+            gmt_modified=1000,
             time_archived=2000,
         )
         db_session.add(archived_session)
@@ -462,12 +464,12 @@ class TestGetSessionsByExternalSessionId:
             workspace_unique_id=test_workspace.workspace_unique_id,
             directory="/test/dir",
             title="External Filter Session",
-            time_created=1000,
-            time_updated=1000,
+            gmt_create=1000,
+            gmt_modified=1000,
         )
         db_session.add(session)
         await db_session.commit()
-        
+
         other_session = Session(
             session_unique_id="sess-ext-filter-002",
             external_session_id="ext-session-other-456",
@@ -475,8 +477,8 @@ class TestGetSessionsByExternalSessionId:
             workspace_unique_id=test_workspace.workspace_unique_id,
             directory="/test/dir",
             title="Other Session",
-            time_created=1000,
-            time_updated=1000,
+            gmt_create=1000,
+            gmt_modified=1000,
         )
         db_session.add(other_session)
         await db_session.commit()
@@ -540,8 +542,8 @@ class TestSessionResponseFields:
             workspace_unique_id=test_workspace.workspace_unique_id,
             directory="/test/dir",
             title="SDK Session Response",
-            time_created=1000,
-            time_updated=1000,
+            gmt_create=1000,
+            gmt_modified=1000,
         )
         db_session.add(session)
         await db_session.commit()

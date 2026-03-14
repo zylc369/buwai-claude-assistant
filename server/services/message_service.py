@@ -2,15 +2,17 @@
 
 import time
 import json
-import uuid
 from typing import List, Optional, Dict, Any, AsyncIterator
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.models import Message
 from repositories.message_repository import MessageRepository
+from repositories.project_repository import ProjectRepository
+from repositories.workspace_repository import WorkspaceRepository
 from claude_client import ClaudeClient, ClaudeClientConfig
 from pool import ClaudeClientPool
+from utils.id_generator import generate_uuidv7
 from logger import get_logger
 
 logger = get_logger(__name__)
@@ -41,8 +43,8 @@ class MessageService:
         message_unique_id: str,
         session_unique_id: str,
         data: Dict[str, Any],
-        time_created: Optional[int] = None,
-        time_updated: Optional[int] = None
+        gmt_create: Optional[int] = None,
+        gmt_modified: Optional[int] = None
     ) -> Message:
         """Create a new message.
         
@@ -50,8 +52,8 @@ class MessageService:
             message_unique_id: Unique identifier for the message.
             session_unique_id: Unique identifier of the parent session.
             data: Message data dictionary (will be stored as JSON).
-            time_created: Creation timestamp (defaults to current time).
-            time_updated: Update timestamp (defaults to current time).
+            gmt_create: Creation timestamp (defaults to current time).
+            gmt_modified: Update timestamp (defaults to current time).
             
         Returns:
             Created message instance.
@@ -62,8 +64,8 @@ class MessageService:
         message = await self.message_repo.create(
             message_unique_id=message_unique_id,
             session_unique_id=session_unique_id,
-            time_created=time_created or current_time,
-            time_updated=time_updated or current_time,
+            gmt_create=gmt_create or current_time,
+            gmt_modified=gmt_modified or current_time,
             data=data
         )
         
@@ -190,6 +192,8 @@ class MessageService:
         prompt: str,
         session_unique_id: str,
         client_config: ClaudeClientConfig,
+        project_unique_id: Optional[str] = None,
+        workspace_unique_id: Optional[str] = None,
         pool: Optional[ClaudeClientPool] = None
     ) -> AsyncIterator[Any]:
         """Send a prompt to AI and yield streaming responses.
@@ -202,6 +206,8 @@ class MessageService:
             prompt: The user prompt to send to AI.
             session_unique_id: Session identifier for conversation continuity.
             client_config: Configuration for ClaudeClient.
+            project_unique_id: Optional project identifier for activity tracking.
+            workspace_unique_id: Optional workspace identifier for activity tracking.
             pool: Optional connection pool for client reuse.
 
         Yields:
@@ -214,16 +220,19 @@ class MessageService:
         logger.info(f"AI operation: sending prompt of length {len(prompt)} characters")
         current_time = int(time.time())
 
-        user_msg_id = f"user-{uuid.uuid4()}"
+        user_msg_id = f"user-{generate_uuidv7()}"
         logger.info(f"Business decision: creating user message {user_msg_id}")
         await self.message_repo.create(
             message_unique_id=user_msg_id,
             session_unique_id=session_unique_id,
-            time_created=current_time,
-            time_updated=current_time,
+            gmt_create=current_time,
+            gmt_modified=current_time,
             data={"role": "user", "content": prompt}
         )
         await self.session.commit()
+
+        if project_unique_id or workspace_unique_id:
+            await self._update_latest_active_time(project_unique_id, workspace_unique_id, current_time)
 
         ai_chunks = []
         logger.info(f"AI operation: querying AI client (using pool={pool is not None})")
@@ -245,7 +254,7 @@ class MessageService:
                         ai_chunks.append(response)
                         yield response
 
-            ai_msg_id = f"assistant-{uuid.uuid4()}"
+            ai_msg_id = f"assistant-{generate_uuidv7()}"
             ai_response_text = self._extract_response_text(ai_chunks)
             logger.info(f"AI operation: received response of length {len(ai_response_text)} characters")
 
@@ -253,8 +262,8 @@ class MessageService:
             await self.message_repo.create(
                 message_unique_id=ai_msg_id,
                 session_unique_id=session_unique_id,
-                time_created=current_time,
-                time_updated=current_time,
+                gmt_create=current_time,
+                gmt_modified=current_time,
                 data={"role": "assistant", "content": ai_response_text}
             )
             await self.session.commit()
@@ -263,6 +272,34 @@ class MessageService:
         except Exception as e:
             logger.error(f"send_ai_prompt failed: {str(e)}")
             raise
+
+    async def _update_latest_active_time(
+        self,
+        project_unique_id: Optional[str],
+        workspace_unique_id: Optional[str],
+        current_time: int
+    ) -> None:
+        """Update latest_active_time for project and workspace.
+
+        Args:
+            project_unique_id: Project identifier to update.
+            workspace_unique_id: Workspace identifier to update.
+            current_time: Current timestamp to set as latest_active_time.
+        """
+        project_repo = ProjectRepository(self.session)
+        workspace_repo = WorkspaceRepository(self.session)
+
+        if project_unique_id:
+            project = await project_repo.get_by_unique_id(project_unique_id)
+            if project:
+                await project_repo.update(project, latest_active_time=current_time)
+                logger.debug(f"Updated latest_active_time for project {project_unique_id}")
+
+        if workspace_unique_id:
+            workspace = await workspace_repo.get_by_unique_id(workspace_unique_id)
+            if workspace:
+                await workspace_repo.update(workspace, latest_active_time=current_time)
+                logger.debug(f"Updated latest_active_time for workspace {workspace_unique_id}")
     
     async def count_messages(self, session_unique_id: str) -> int:
         """Count messages for a specific session.
@@ -289,7 +326,7 @@ class MessageService:
         Args:
             message_unique_id: The unique identifier of the message to update.
             data: New message data dictionary (optional).
-            **kwargs: Additional fields to update (e.g., time_updated).
+            **kwargs: Additional fields to update (e.g., gmt_modified).
 
         Returns:
             Updated message instance if found, None otherwise.
@@ -302,9 +339,9 @@ class MessageService:
 
         update_data = kwargs.copy()
         if data is not None:
-            update_data["data"] = json.dumps(data)
-        if "time_updated" not in update_data:
-            update_data["time_updated"] = int(time.time())
+            update_data["data"] = json.dumps(data, ensure_ascii=False)
+        if "gmt_modified" not in update_data:
+            update_data["gmt_modified"] = int(time.time())
 
         logger.info(f"Business decision: updating message {message_unique_id}")
         updated = await self.message_repo.update(message, **update_data)

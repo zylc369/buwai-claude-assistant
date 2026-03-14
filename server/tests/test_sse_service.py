@@ -308,11 +308,11 @@ class TestSSEServiceWithDatabase:
         
         project = Project(
             project_unique_id="proj_sse_001",
-            worktree="/test/path",
+            directory="/test/path",
             branch="main",
             name="Test Project",
-            time_created=int(time.time()),
-            time_updated=int(time.time())
+            gmt_create=int(time.time()),
+            gmt_modified=int(time.time())
         )
         db_session.add(project)
         await db_session.flush()
@@ -322,7 +322,9 @@ class TestSSEServiceWithDatabase:
             branch="main",
             name="Test Workspace",
             directory="/test/path",
-            project_unique_id="proj_sse_001"
+            project_unique_id="proj_sse_001",
+            gmt_create=int(time.time()),
+            gmt_modified=int(time.time())
         )
         db_session.add(workspace)
         await db_session.flush()
@@ -334,8 +336,8 @@ class TestSSEServiceWithDatabase:
             workspace_unique_id="ws_sse_001",
             directory="/test/path",
             title="Test Session",
-            time_created=int(time.time()),
-            time_updated=int(time.time())
+            gmt_create=int(time.time()),
+            gmt_modified=int(time.time())
         )
         db_session.add(session)
         await db_session.flush()

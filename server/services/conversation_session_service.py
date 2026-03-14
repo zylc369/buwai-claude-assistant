@@ -5,8 +5,11 @@ from typing import List, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from config import get_config
 from database.models import Session
 from repositories.conversation_session_repository import ConversationSessionRepository
+from services.project_service import ProjectService
+from services.workspace_service import WorkspaceService
 from logger import get_logger
 
 logger = get_logger(__name__)
@@ -50,8 +53,8 @@ class ConversationSessionService:
         external_session_id: str,
         project_unique_id: str,
         workspace_unique_id: str,
-        directory: str,
-        title: str,
+        directory: Optional[str] = None,
+        title: str = "",
         time_compacting: Optional[int] = None,
         time_archived: Optional[int] = None,
     ) -> Session:
@@ -62,7 +65,7 @@ class ConversationSessionService:
             external_session_id: External session identifier (required).
             project_unique_id: The unique identifier of the project.
             workspace_unique_id: The unique identifier of the workspace.
-            directory: The working directory path.
+            directory: The working directory path (computed if not provided).
             title: The session title.
             time_compacting: Optional compacting timestamp.
             time_archived: Optional archived timestamp.
@@ -73,6 +76,12 @@ class ConversationSessionService:
         logger.debug(f"create_session called with session_unique_id={session_unique_id}")
         current_time = int(time.time())
 
+        # Compute directory from project/workspace if not provided
+        if directory is None:
+            directory = await self._compute_session_directory(
+                project_unique_id, workspace_unique_id
+            )
+
         logger.info(f"Business decision: creating session {session_unique_id} for project {project_unique_id}")
         session = await self.session_repo.create(
             session_unique_id=session_unique_id,
@@ -81,8 +90,8 @@ class ConversationSessionService:
             workspace_unique_id=workspace_unique_id,
             directory=directory,
             title=title,
-            time_created=current_time,
-            time_updated=current_time,
+            gmt_create=current_time,
+            gmt_modified=current_time,
             time_compacting=time_compacting,
             time_archived=time_archived,
         )
@@ -92,6 +101,36 @@ class ConversationSessionService:
 
         logger.debug(f"create_session completed")
         return session
+    
+    async def _compute_session_directory(
+        self,
+        project_unique_id: str,
+        workspace_unique_id: str,
+    ) -> str:
+        config = get_config()
+        projects_root = config.projects.root
+        
+        workspace_service = WorkspaceService(self.session)
+        workspace = await workspace_service.get_workspace_by_unique_id(workspace_unique_id)
+        
+        if workspace is not None:
+            workspace_dir = workspace.directory
+            if workspace_dir is not None:
+                logger.debug(f"Using workspace directory: {workspace_dir}")
+                return workspace_dir
+        
+        project_service = ProjectService(self.session)
+        project = await project_service.get_project_by_unique_id(project_unique_id)
+        
+        if project is not None:
+            project_dir = project.directory
+            if project_dir is not None:
+                logger.debug(f"Using project directory: {project_dir}")
+                return project_dir
+        
+        fallback_dir = f"{projects_root}/{project_unique_id}/{workspace_unique_id}"
+        logger.warning(f"Using fallback directory: {fallback_dir}")
+        return fallback_dir
     
     async def get_by_unique_id(self, session_unique_id: str) -> Optional[Session]:
         """Get a session by its unique identifier.
@@ -179,8 +218,8 @@ class ConversationSessionService:
             logger.debug(f"update_session completed, session not found")
             return None
 
-        # Auto-update time_updated
-        kwargs["time_updated"] = int(time.time())
+        # Auto-update gmt_modified
+        kwargs["gmt_modified"] = int(time.time())
 
         logger.info(f"Business decision: updating session {session_unique_id}")
         updated = await self.session_repo.update(session, **kwargs)

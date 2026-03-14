@@ -1,5 +1,6 @@
 """Database models for the AI conversation workspace system."""
 
+import re
 from sqlalchemy import (
     Column,
     Integer,
@@ -12,6 +13,10 @@ from sqlalchemy.orm import declarative_base, relationship
 Base = declarative_base()
 
 
+# Directory name pattern for validation
+DIRECTORY_PATTERN = re.compile(r'^[0-9a-zA-Z_]+$')
+
+
 class Project(Base):
     """Project model for organizing workspaces and sessions."""
 
@@ -19,14 +24,14 @@ class Project(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     project_unique_id = Column(Text, unique=True, nullable=False)
-    worktree = Column(Text, nullable=False)
+    directory = Column(Text, nullable=False)  # Renamed from worktree
     branch = Column(Text, nullable=True)
     name = Column(Text, nullable=True)
     time_initialized = Column(Integer, nullable=True)
-    time_created = Column(Integer, nullable=False)
-    time_updated = Column(Integer, nullable=False)
+    gmt_create = Column(Integer, nullable=False)  # Renamed from time_created
+    gmt_modified = Column(Integer, nullable=False)  # Renamed from time_updated
+    latest_active_time = Column(Integer, nullable=True)  # NEW
 
-    # Relationships
     workspaces = relationship("Workspace", back_populates="project", cascade="all, delete-orphan")
     sessions = relationship("Session", back_populates="project", cascade="all, delete-orphan")
 
@@ -41,18 +46,19 @@ class Workspace(Base):
     branch = Column(Text, nullable=True)
     name = Column(Text, nullable=True)
     directory = Column(Text, nullable=True)
-    extra = Column(Text, nullable=True)  # JSON data stored as text
+    extra = Column(Text, nullable=True)
     project_unique_id = Column(
         Text,
         ForeignKey("project.project_unique_id", ondelete="CASCADE"),
         nullable=False,
     )
+    gmt_create = Column(Integer, nullable=False)  # NEW
+    gmt_modified = Column(Integer, nullable=False)  # NEW
+    latest_active_time = Column(Integer, nullable=True)  # NEW
 
-    # Relationships
     project = relationship("Project", back_populates="workspaces")
     sessions = relationship("Session", back_populates="workspace", cascade="all, delete-orphan")
 
-    # Index
     __table_args__ = (
         Index("workspace_project_unique_idx", "project_unique_id"),
     )
@@ -79,17 +85,15 @@ class Session(Base):
     )
     directory = Column(Text, nullable=False)
     title = Column(Text, nullable=False)
-    time_created = Column(Integer, nullable=False)
-    time_updated = Column(Integer, nullable=False)
+    gmt_create = Column(Integer, nullable=False)  # Renamed from time_created
+    gmt_modified = Column(Integer, nullable=False)  # Renamed from time_updated
     time_compacting = Column(Integer, nullable=True)
     time_archived = Column(Integer, nullable=True)
 
-    # Relationships
     project = relationship("Project", back_populates="sessions")
     workspace = relationship("Workspace", back_populates="sessions")
     messages = relationship("Message", back_populates="session", cascade="all, delete-orphan")
 
-    # Indexes
     __table_args__ = (
         Index("session_project_unique_idx", "project_unique_id"),
         Index("session_workspace_unique_idx", "workspace_unique_id"),
@@ -108,14 +112,12 @@ class Message(Base):
         ForeignKey("session.session_unique_id", ondelete="CASCADE"),
         nullable=False,
     )
-    time_created = Column(Integer, nullable=False)
-    time_updated = Column(Integer, nullable=False)
-    data = Column(Text, nullable=False)  # JSON data stored as text
+    gmt_create = Column(Integer, nullable=False)  # Renamed from time_created
+    gmt_modified = Column(Integer, nullable=False)  # Renamed from time_updated
+    data = Column(Text, nullable=False)
 
-    # Relationships
     session = relationship("Session", back_populates="messages")
 
-    # Index
     __table_args__ = (
         Index("message_session_unique_idx", "session_unique_id"),
     )

@@ -9,24 +9,25 @@
 export interface Project {
   id: number;
   project_unique_id: string;
-  worktree: string;
+  directory: string;
   branch: string | null;
   name: string | null;
   time_initialized: number | null;
-  time_created: number;
-  time_updated: number;
+  gmt_create: number;
+  gmt_modified: number;
+  latest_active_time: number | null;
 }
 
 export interface CreateProjectRequest {
   project_unique_id: string;
-  worktree: string | null;
+  directory: string | null;
   name?: string | null;
   branch?: string | null;
   time_initialized?: number | null;
 }
 
 export interface UpdateProjectRequest {
-  worktree?: string;
+  directory?: string;
   name?: string | null;
   branch?: string | null;
   time_initialized?: number | null;
@@ -50,6 +51,9 @@ export interface Workspace {
   branch: string | null;
   directory: string | null;
   extra: string | null;
+  gmt_create: number;
+  gmt_modified: number;
+  latest_active_time: number | null;
 }
 
 export interface CreateWorkspaceRequest {
@@ -87,8 +91,8 @@ export interface Session {
   workspace_unique_id: string;
   directory: string;
   title: string;
-  time_created: number;
-  time_updated: number;
+  gmt_create: number;
+  gmt_modified: number;
   time_compacting: number | null;
   time_archived: number | null;
 }
@@ -124,8 +128,8 @@ export interface Message {
   id: number;
   message_unique_id: string;
   session_unique_id: string;
-  time_created: number;
-  time_updated: number;
+  gmt_create: number;
+  gmt_modified: number;
   data: string;
 }
 

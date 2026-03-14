@@ -12,7 +12,7 @@ from repositories.project_repository import ProjectRepository
 async def create_test_project(
     repo: ProjectRepository,
     project_unique_id: str,
-    worktree: str,
+    directory: str,
     name: str = None,
     branch: str = None,
 ) -> Project:
@@ -20,12 +20,12 @@ async def create_test_project(
     current_time = int(time.time())
     return await repo.create(
         project_unique_id=project_unique_id,
-        worktree=worktree,
+        directory=directory,
         name=name,
         branch=branch,
         time_initialized=current_time,
-        time_created=current_time,
-        time_updated=current_time,
+        gmt_create=current_time,
+        gmt_modified=current_time,
     )
 
 
@@ -40,7 +40,7 @@ class TestProjectRepositoryCreate:
         project = await create_test_project(
             repo,
             project_unique_id="proj-001",
-            worktree="/path/to/worktree",
+            directory="my_project_dir",
             name="Test Project",
             branch="main",
         )
@@ -48,7 +48,7 @@ class TestProjectRepositoryCreate:
         
         assert project.id is not None
         assert project.project_unique_id == "proj-001"
-        assert project.worktree == "/path/to/worktree"
+        assert project.directory == "my_project_dir"
         assert project.name == "Test Project"
         assert project.branch == "main"
 
@@ -60,7 +60,7 @@ class TestProjectRepositoryCreate:
         project = await create_test_project(
             repo,
             project_unique_id="proj-002",
-            worktree="/path/to/worktree2",
+            directory="project_dir_2",
             name=None,
             branch=None,
         )
@@ -82,7 +82,7 @@ class TestProjectRepositoryGetById:
         project = await create_test_project(
             repo,
             project_unique_id="proj-003",
-            worktree="/path/to/worktree3",
+            directory="project_dir_3",
             name="Find By ID",
         )
         await db_session.commit()
@@ -115,7 +115,7 @@ class TestProjectRepositoryGetByUniqueId:
         project = await create_test_project(
             repo,
             project_unique_id="unique-proj-001",
-            worktree="/path/to/worktree",
+            directory="my_project_dir",
             name="Unique Project",
         )
         await db_session.commit()
@@ -147,13 +147,13 @@ class TestProjectRepositoryGetByName:
         await create_test_project(
             repo,
             project_unique_id="proj-exact-001",
-            worktree="/path/to/worktree1",
+            directory="project_dir_1",
             name="Exact Match Project",
         )
         await create_test_project(
             repo,
             project_unique_id="proj-exact-002",
-            worktree="/path/to/worktree2",
+            directory="project_dir_2",
             name="Different Project",
         )
         await db_session.commit()
@@ -171,19 +171,19 @@ class TestProjectRepositoryGetByName:
         await create_test_project(
             repo,
             project_unique_id="proj-fuzzy-001",
-            worktree="/path/to/worktree1",
+            directory="project_dir_1",
             name="My Awesome Project",
         )
         await create_test_project(
             repo,
             project_unique_id="proj-fuzzy-002",
-            worktree="/path/to/worktree2",
+            directory="project_dir_2",
             name="Another Awesome App",
         )
         await create_test_project(
             repo,
             project_unique_id="proj-fuzzy-003",
-            worktree="/path/to/worktree3",
+            directory="project_dir_3",
             name="Different Thing",
         )
         await db_session.commit()
@@ -204,7 +204,7 @@ class TestProjectRepositoryGetByName:
         await create_test_project(
             repo,
             project_unique_id="proj-case-001",
-            worktree="/path/to/worktree",
+            directory="my_project_dir",
             name="MyProject",
         )
         await db_session.commit()
@@ -229,7 +229,7 @@ class TestProjectRepositoryGetByName:
         await create_test_project(
             repo,
             project_unique_id="proj-nomatch-001",
-            worktree="/path/to/worktree",
+            directory="my_project_dir",
             name="Some Project",
         )
         await db_session.commit()
@@ -251,7 +251,7 @@ class TestProjectRepositoryList:
             await create_test_project(
                 repo,
                 project_unique_id=f"proj-list-{i:03d}",
-                worktree=f"/path/to/worktree{i}",
+                directory=f"project_dir_{i}",
                 name=f"Project {i}",
             )
         await db_session.commit()
@@ -269,7 +269,7 @@ class TestProjectRepositoryList:
             await create_test_project(
                 repo,
                 project_unique_id=f"proj-page-{i:03d}",
-                worktree=f"/path/to/worktree{i}",
+                directory=f"project_dir_{i}",
                 name=f"Project {i}",
             )
         await db_session.commit()
@@ -294,19 +294,19 @@ class TestProjectRepositoryList:
         await create_test_project(
             repo,
             project_unique_id="proj-filter-001",
-            worktree="/path/to/worktree1",
+            directory="project_dir_1",
             name="Alpha Project",
         )
         await create_test_project(
             repo,
             project_unique_id="proj-filter-002",
-            worktree="/path/to/worktree2",
+            directory="project_dir_2",
             name="Beta Project",
         )
         await create_test_project(
             repo,
             project_unique_id="proj-filter-003",
-            worktree="/path/to/worktree3",
+            directory="project_dir_3",
             name="Alpha App",
         )
         await db_session.commit()
@@ -328,7 +328,7 @@ class TestProjectRepositoryList:
             await create_test_project(
                 repo,
                 project_unique_id=f"proj-pf-{i:03d}",
-                worktree=f"/path/to/worktree{i}",
+                directory=f"project_dir_{i}",
                 name=f"Test Project {i}",
             )
         await db_session.commit()
@@ -349,7 +349,7 @@ class TestProjectRepositoryUpdate:
         project = await create_test_project(
             repo,
             project_unique_id="proj-update-001",
-            worktree="/path/to/worktree",
+            directory="my_project_dir",
             name="Original Name",
         )
         await db_session.commit()
@@ -368,7 +368,7 @@ class TestProjectRepositoryUpdate:
         project = await create_test_project(
             repo,
             project_unique_id="proj-update-002",
-            worktree="/original/path",
+            directory="original_dir",
             name="Original",
             branch="main",
         )
@@ -377,17 +377,17 @@ class TestProjectRepositoryUpdate:
         new_time = int(time.time()) + 1000
         updated = await repo.update(
             project,
-            worktree="/new/path",
+            directory="new_dir",
             name="Updated",
             branch="develop",
-            time_updated=new_time,
+            gmt_modified=new_time,
         )
         await db_session.commit()
-        
-        assert updated.worktree == "/new/path"
+
+        assert updated.directory == "new_dir"
         assert updated.name == "Updated"
         assert updated.branch == "develop"
-        assert updated.time_updated == new_time
+        assert updated.gmt_modified == new_time
 
 
 class TestProjectRepositoryDelete:
@@ -401,7 +401,7 @@ class TestProjectRepositoryDelete:
         project = await create_test_project(
             repo,
             project_unique_id="proj-delete-001",
-            worktree="/path/to/worktree",
+            directory="my_project_dir",
             name="To Delete",
         )
         await db_session.commit()
@@ -417,16 +417,16 @@ class TestProjectRepositoryDelete:
     async def test_delete_cascades_to_workspaces(self, db_session: AsyncSession):
         """Test that deleting a project cascades to related workspaces."""
         repo = ProjectRepository(db_session)
-        
+
         # Create project
         project = await create_test_project(
             repo,
             project_unique_id="proj-cascade-001",
-            worktree="/path/to/worktree",
+            directory="my_project_dir",
             name="Cascade Project",
         )
         await db_session.flush()
-        
+
         # Create workspace for the project
         current_time = int(time.time())
         workspace = Workspace(
@@ -434,14 +434,16 @@ class TestProjectRepositoryDelete:
             project_unique_id="proj-cascade-001",
             name="Test Workspace",
             directory="/test/dir",
+            gmt_create=current_time,
+            gmt_modified=current_time,
         )
         db_session.add(workspace)
         await db_session.commit()
-        
+
         # Delete the project
         await repo.delete(project)
         await db_session.commit()
-        
+
         # Verify workspace is also deleted
         from sqlalchemy import select
         result = await db_session.execute(
@@ -453,28 +455,30 @@ class TestProjectRepositoryDelete:
     async def test_delete_cascades_to_sessions(self, db_session: AsyncSession):
         """Test that deleting a project cascades to related sessions."""
         repo = ProjectRepository(db_session)
-        
+
         # Create project
         project = await create_test_project(
             repo,
             project_unique_id="proj-cascade-002",
-            worktree="/path/to/worktree",
+            directory="my_project_dir",
             name="Cascade Project 2",
         )
         await db_session.flush()
-        
+
         # Create workspace
+        current_time = int(time.time())
         workspace = Workspace(
             workspace_unique_id="ws-002",
             project_unique_id="proj-cascade-002",
             name="Test Workspace",
             directory="/test/dir",
+            gmt_create=current_time,
+            gmt_modified=current_time,
         )
         db_session.add(workspace)
         await db_session.flush()
-        
+
         # Create session
-        current_time = int(time.time())
         session = Session(
             session_unique_id="sess-001",
             external_session_id="external-sess-001",
@@ -482,16 +486,16 @@ class TestProjectRepositoryDelete:
             workspace_unique_id="ws-002",
             directory="/test/dir",
             title="Test Session",
-            time_created=current_time,
-            time_updated=current_time,
+            gmt_create=current_time,
+            gmt_modified=current_time,
         )
         db_session.add(session)
         await db_session.commit()
-        
+
         # Delete the project
         await repo.delete(project)
         await db_session.commit()
-        
+
         # Verify session is also deleted
         from sqlalchemy import select
         result = await db_session.execute(
@@ -503,28 +507,30 @@ class TestProjectRepositoryDelete:
     async def test_delete_cascades_to_messages(self, db_session: AsyncSession):
         """Test that deleting a project cascades to related messages."""
         repo = ProjectRepository(db_session)
-        
+
         # Create project
         project = await create_test_project(
             repo,
             project_unique_id="proj-cascade-003",
-            worktree="/path/to/worktree",
+            directory="my_project_dir",
             name="Cascade Project 3",
         )
         await db_session.flush()
-        
+
         # Create workspace
+        current_time = int(time.time())
         workspace = Workspace(
             workspace_unique_id="ws-003",
             project_unique_id="proj-cascade-003",
             name="Test Workspace",
             directory="/test/dir",
+            gmt_create=current_time,
+            gmt_modified=current_time,
         )
         db_session.add(workspace)
         await db_session.flush()
-        
+
         # Create session
-        current_time = int(time.time())
         session = Session(
             session_unique_id="sess-002",
             external_session_id="external-sess-002",
@@ -532,27 +538,27 @@ class TestProjectRepositoryDelete:
             workspace_unique_id="ws-003",
             directory="/test/dir",
             title="Test Session",
-            time_created=current_time,
-            time_updated=current_time,
+            gmt_create=current_time,
+            gmt_modified=current_time,
         )
         db_session.add(session)
         await db_session.flush()
-        
+
         # Create message
         message = Message(
             message_unique_id="msg-001",
             session_unique_id="sess-002",
-            time_created=current_time,
-            time_updated=current_time,
+            gmt_create=current_time,
+            gmt_modified=current_time,
             data='{"content": "test message"}',
         )
         db_session.add(message)
         await db_session.commit()
-        
+
         # Delete the project
         await repo.delete(project)
         await db_session.commit()
-        
+
         # Verify message is also deleted
         from sqlalchemy import select
         result = await db_session.execute(
@@ -573,7 +579,7 @@ class TestProjectRepositoryCount:
             await create_test_project(
                 repo,
                 project_unique_id=f"proj-count-{i:03d}",
-                worktree=f"/path/to/worktree{i}",
+                directory=f"project_dir_{i}",
                 name=f"Project {i}",
             )
         await db_session.commit()
@@ -590,19 +596,19 @@ class TestProjectRepositoryCount:
         await create_test_project(
             repo,
             project_unique_id="proj-count-filter-001",
-            worktree="/path/to/worktree1",
+            directory="project_dir_1",
             name="Alpha",
         )
         await create_test_project(
             repo,
             project_unique_id="proj-count-filter-002",
-            worktree="/path/to/worktree2",
+            directory="project_dir_2",
             name="Beta",
         )
         await create_test_project(
             repo,
             project_unique_id="proj-count-filter-003",
-            worktree="/path/to/worktree3",
+            directory="project_dir_3",
             name="Alpha",
         )
         await db_session.commit()
@@ -625,7 +631,7 @@ class TestProjectRepositoryExists:
         project = await create_test_project(
             repo,
             project_unique_id="proj-exists-001",
-            worktree="/path/to/worktree",
+            directory="my_project_dir",
             name="Existing Project",
         )
         await db_session.commit()

@@ -10,3 +10,7 @@ app-logs/
 
 # Backup files
 *~
+
+# Projects root directory
+projectsRoot/
+dev-projectsRoot/

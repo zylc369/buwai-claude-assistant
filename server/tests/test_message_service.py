@@ -16,11 +16,11 @@ from claude_client import ClaudeClientConfig
 async def setup_test_data(db_session: AsyncSession):
     project = Project(
         project_unique_id="proj_svc_001",
-        worktree="/test/path",
+        directory="/test/path",
         branch="main",
         name="Test Project",
-        time_created=int(time.time()),
-        time_updated=int(time.time())
+        gmt_create=int(time.time()),
+        gmt_modified=int(time.time())
     )
     db_session.add(project)
     await db_session.flush()
@@ -30,7 +30,9 @@ async def setup_test_data(db_session: AsyncSession):
         branch="main",
         name="Test Workspace",
         directory="/test/path",
-        project_unique_id="proj_svc_001"
+        project_unique_id="proj_svc_001",
+        gmt_create=int(time.time()),
+        gmt_modified=int(time.time())
     )
     db_session.add(workspace)
     await db_session.flush()
@@ -42,8 +44,8 @@ async def setup_test_data(db_session: AsyncSession):
         workspace_unique_id="ws_svc_001",
         directory="/test/path",
         title="Test Session",
-        time_created=int(time.time()),
-        time_updated=int(time.time())
+        gmt_create=int(time.time()),
+        gmt_modified=int(time.time())
     )
     db_session.add(session)
     await db_session.flush()
@@ -73,8 +75,8 @@ async def test_create_message(db_session: AsyncSession, setup_test_data):
     assert message.id is not None
     assert message.message_unique_id == "msg_svc_001"
     assert message.session_unique_id == "sess_svc_001"
-    assert message.time_created is not None
-    assert message.time_updated is not None
+    assert message.gmt_create is not None
+    assert message.gmt_modified is not None
     
     parsed_data = json.loads(message.data)
     assert parsed_data["role"] == "user"
@@ -90,12 +92,12 @@ async def test_create_message_with_custom_timestamps(db_session: AsyncSession, s
         message_unique_id="msg_svc_002",
         session_unique_id="sess_svc_001",
         data={"role": "assistant", "content": "Response"},
-        time_created=custom_time,
-        time_updated=custom_time + 100
+        gmt_create=custom_time,
+        gmt_modified=custom_time + 100
     )
     
-    assert message.time_created == custom_time
-    assert message.time_updated == custom_time + 100
+    assert message.gmt_create == custom_time
+    assert message.gmt_modified == custom_time + 100
 
 
 @pytest.mark.asyncio
@@ -205,8 +207,8 @@ async def test_list_messages_empty_session(db_session: AsyncSession, setup_test_
         workspace_unique_id="ws_svc_001",
         directory="/test/path",
         title="Empty Session",
-        time_created=int(time.time()),
-        time_updated=int(time.time())
+        gmt_create=int(time.time()),
+        gmt_modified=int(time.time())
     )
     db_session.add(new_session)
     await db_session.flush()
@@ -397,3 +399,92 @@ async def test_send_ai_prompt_pool_releases_on_error(db_session: AsyncSession, s
             pass
     
     mock_pool.release_client.assert_called_once_with("sess_error")
+
+
+@pytest.mark.asyncio
+async def test_send_ai_prompt_updates_latest_active_time(db_session: AsyncSession, setup_test_data):
+    service = MessageService(db_session)
+    
+    mock_client = AsyncMock()
+    mock_client.query = AsyncMock()
+    
+    async def mock_receive_response_gen():
+        for chunk in ["Response"]:
+            yield chunk
+    
+    async def mock_receive_response():
+        return mock_receive_response_gen()
+    
+    mock_client.receive_response = AsyncMock(side_effect=mock_receive_response)
+    
+    config = ClaudeClientConfig(
+        cwd="/test",
+        settings="/tmp/test_settings.json"
+    )
+    
+    with patch('services.message_service.ClaudeClient') as MockClaudeClient:
+        mock_context = AsyncMock()
+        mock_context.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_context.__aexit__ = AsyncMock(return_value=None)
+        MockClaudeClient.return_value = mock_context
+        
+        results = []
+        async for response in service.send_ai_prompt(
+            prompt="Test prompt with activity tracking",
+            session_unique_id="sess_svc_001",
+            client_config=config,
+            project_unique_id="proj_svc_001",
+            workspace_unique_id="ws_svc_001"
+        ):
+            results.append(response)
+        
+        assert len(results) == 1
+        
+    await db_session.refresh(setup_test_data["project"])
+    await db_session.refresh(setup_test_data["workspace"])
+    
+    assert setup_test_data["project"].latest_active_time is not None
+    assert setup_test_data["workspace"].latest_active_time is not None
+
+
+@pytest.mark.asyncio
+async def test_send_ai_prompt_with_project_only(db_session: AsyncSession, setup_test_data):
+    service = MessageService(db_session)
+    
+    mock_client = AsyncMock()
+    mock_client.query = AsyncMock()
+    
+    async def mock_receive_response_gen():
+        for chunk in ["Response"]:
+            yield chunk
+    
+    async def mock_receive_response():
+        return mock_receive_response_gen()
+    
+    mock_client.receive_response = AsyncMock(side_effect=mock_receive_response)
+    
+    config = ClaudeClientConfig(
+        cwd="/test",
+        settings="/tmp/test_settings.json"
+    )
+    
+    with patch('services.message_service.ClaudeClient') as MockClaudeClient:
+        mock_context = AsyncMock()
+        mock_context.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_context.__aexit__ = AsyncMock(return_value=None)
+        MockClaudeClient.return_value = mock_context
+        
+        results = []
+        async for response in service.send_ai_prompt(
+            prompt="Test prompt",
+            session_unique_id="sess_svc_001",
+            client_config=config,
+            project_unique_id="proj_svc_001"
+        ):
+            results.append(response)
+        
+        assert len(results) == 1
+        
+    await db_session.refresh(setup_test_data["project"])
+    
+    assert setup_test_data["project"].latest_active_time is not None

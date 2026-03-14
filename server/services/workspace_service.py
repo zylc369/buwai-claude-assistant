@@ -1,13 +1,41 @@
 """Workspace service for business logic."""
 
+import re
+import time
 from typing import List, Optional
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.models import Workspace
 from repositories.workspace_repository import WorkspaceRepository
 from logger import get_logger
+from utils.id_generator import generate_uuidv7
 
 logger = get_logger(__name__)
+
+# Directory name pattern for validation
+DIRECTORY_PATTERN = re.compile(r'^[0-9a-zA-Z_]+$')
+
+
+def _validate_directory(directory: str) -> None:
+    """Validate directory name format.
+
+    Only validates simple directory names (no path separators).
+    Full paths are allowed without validation.
+
+    Args:
+        directory: Directory name to validate.
+
+    Raises:
+        ValueError: If directory name doesn't match the required pattern.
+    """
+    if '/' in directory or '\\' in directory:
+        return
+    if not DIRECTORY_PATTERN.match(directory):
+        raise ValueError(
+            f"Invalid directory name '{directory}'. "
+            "Directory must contain only alphanumeric characters and underscores."
+        )
 
 
 class WorkspaceService:
@@ -53,6 +81,11 @@ class WorkspaceService:
             Created workspace instance.
         """
         logger.debug(f"create_workspace called with workspace_unique_id={workspace_unique_id}, project_unique_id={project_unique_id}")
+
+        if directory:
+            _validate_directory(directory)
+
+        current_time = int(time.time() * 1000)
         logger.info(f"Business decision: creating workspace {workspace_unique_id}")
         workspace = await self.workspace_repo.create(
             workspace_unique_id=workspace_unique_id,
@@ -60,7 +93,10 @@ class WorkspaceService:
             name=name,
             branch=branch,
             directory=directory,
-            extra=extra
+            extra=extra,
+            gmt_create=current_time,
+            gmt_modified=current_time,
+            latest_active_time=current_time
         )
 
         await self.session.commit()
@@ -145,12 +181,47 @@ class WorkspaceService:
             logger.debug(f"update_workspace completed, workspace not found")
             return None
 
+        if 'directory' in kwargs and kwargs['directory']:
+            _validate_directory(kwargs['directory'])
+
+        kwargs['gmt_modified'] = int(time.time() * 1000)
+
         logger.info(f"Business decision: updating workspace {workspace_id}")
         updated = await self.workspace_repo.update(workspace, **kwargs)
         await self.session.commit()
         await self.session.refresh(updated)
 
         logger.debug(f"update_workspace completed")
+        return updated
+
+    async def update_latest_active_time(
+        self,
+        workspace_id: int
+    ) -> Optional[Workspace]:
+        """Update the latest active time for a workspace.
+
+        Args:
+            workspace_id: Primary key ID of the workspace.
+
+        Returns:
+            Updated workspace if found, None otherwise.
+        """
+        logger.debug(f"update_latest_active_time called with workspace_id={workspace_id}")
+        workspace = await self.workspace_repo.get_by_id(workspace_id)
+        if not workspace:
+            logger.debug(f"update_latest_active_time completed, workspace not found")
+            return None
+
+        current_time = int(time.time() * 1000)
+        updated = await self.workspace_repo.update(
+            workspace,
+            latest_active_time=current_time,
+            gmt_modified=current_time
+        )
+        await self.session.commit()
+        await self.session.refresh(updated)
+
+        logger.debug(f"update_latest_active_time completed")
         return updated
     
     async def delete_workspace(self, workspace_id: int) -> bool:

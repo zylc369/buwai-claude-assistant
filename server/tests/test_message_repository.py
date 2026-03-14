@@ -16,11 +16,11 @@ async def setup_test_data(db_session: AsyncSession):
     # Create project
     project = Project(
         project_unique_id="proj_001",
-        worktree="/test/path",
+        directory="/test/path",
         branch="main",
         name="Test Project",
-        time_created=int(time.time()),
-        time_updated=int(time.time())
+        gmt_create=int(time.time()),
+        gmt_modified=int(time.time())
     )
     db_session.add(project)
     await db_session.flush()
@@ -31,7 +31,9 @@ async def setup_test_data(db_session: AsyncSession):
         branch="main",
         name="Test Workspace",
         directory="/test/path",
-        project_unique_id="proj_001"
+        project_unique_id="proj_001",
+        gmt_create=int(time.time()),
+        gmt_modified=int(time.time())
     )
     db_session.add(workspace)
     await db_session.flush()
@@ -44,8 +46,8 @@ async def setup_test_data(db_session: AsyncSession):
         workspace_unique_id="ws_001",
         directory="/test/path",
         title="Test Session",
-        time_created=int(time.time()),
-        time_updated=int(time.time())
+        gmt_create=int(time.time()),
+        gmt_modified=int(time.time())
     )
     db_session.add(session)
     await db_session.flush()
@@ -72,16 +74,16 @@ async def test_create_message(db_session: AsyncSession, setup_test_data):
     message = await repo.create(
         message_unique_id="msg_001",
         session_unique_id="sess_001",
-        time_created=current_time,
-        time_updated=current_time,
+        gmt_create=current_time,
+        gmt_modified=current_time,
         data=message_data
     )
     
     assert message.id is not None
     assert message.message_unique_id == "msg_001"
     assert message.session_unique_id == "sess_001"
-    assert message.time_created == current_time
-    assert message.time_updated == current_time
+    assert message.gmt_create == current_time
+    assert message.gmt_modified == current_time
     
     # Verify data is stored as JSON string
     assert isinstance(message.data, str)
@@ -112,8 +114,8 @@ async def test_create_message_with_complex_data(db_session: AsyncSession, setup_
     message = await repo.create(
         message_unique_id="msg_002",
         session_unique_id="sess_001",
-        time_created=current_time,
-        time_updated=current_time,
+        gmt_create=current_time,
+        gmt_modified=current_time,
         data=message_data
     )
     
@@ -134,8 +136,8 @@ async def test_get_by_unique_id_exists(db_session: AsyncSession, setup_test_data
     await repo.create(
         message_unique_id="msg_003",
         session_unique_id="sess_001",
-        time_created=current_time,
-        time_updated=current_time,
+        gmt_create=current_time,
+        gmt_modified=current_time,
         data={"role": "user", "content": "Test message"}
     )
     
@@ -168,8 +170,8 @@ async def test_get_by_session_unique_id(db_session: AsyncSession, setup_test_dat
         await repo.create(
             message_unique_id=f"msg_{i+10}",
             session_unique_id="sess_001",
-            time_created=current_time + i,
-            time_updated=current_time + i,
+            gmt_create=current_time + i,
+            gmt_modified=current_time + i,
             data={"role": "user", "content": f"Message {i}"}
         )
     
@@ -177,7 +179,7 @@ async def test_get_by_session_unique_id(db_session: AsyncSession, setup_test_dat
     result = await repo.get_by_session_unique_id("sess_001")
     
     assert len(result) == 5
-    # Messages should be ordered by time_created
+    # Messages should be ordered by gmt_create
     contents = [json.loads(m.data)["content"] for m in result]
     assert "Message 0" in contents
     assert "Message 4" in contents
@@ -194,8 +196,8 @@ async def test_get_by_session_unique_id_with_pagination(db_session: AsyncSession
         await repo.create(
             message_unique_id=f"msg_page_{i}",
             session_unique_id="sess_001",
-            time_created=current_time + i,
-            time_updated=current_time + i,
+            gmt_create=current_time + i,
+            gmt_modified=current_time + i,
             data={"role": "user", "content": f"Message {i}"}
         )
     
@@ -221,8 +223,8 @@ async def test_get_by_session_unique_id_empty(db_session: AsyncSession, setup_te
         workspace_unique_id="ws_001",
         directory="/test/path",
         title="Empty Session",
-        time_created=int(time.time()),
-        time_updated=int(time.time())
+        gmt_create=int(time.time()),
+        gmt_modified=int(time.time())
     )
     db_session.add(new_session)
     await db_session.flush()
@@ -244,8 +246,8 @@ async def test_list_method(db_session: AsyncSession, setup_test_data):
         await repo.create(
             message_unique_id=f"msg_list_{i}",
             session_unique_id="sess_001",
-            time_created=current_time + i,
-            time_updated=current_time + i,
+            gmt_create=current_time + i,
+            gmt_modified=current_time + i,
             data={"role": "user", "content": f"List message {i}"}
         )
     
@@ -266,8 +268,8 @@ async def test_count_by_session(db_session: AsyncSession, setup_test_data):
         await repo.create(
             message_unique_id=f"msg_count_{i}",
             session_unique_id="sess_001",
-            time_created=current_time + i,
-            time_updated=current_time + i,
+            gmt_create=current_time + i,
+            gmt_modified=current_time + i,
             data={"role": "user", "content": f"Count message {i}"}
         )
     
@@ -290,8 +292,8 @@ async def test_count_by_session_empty(db_session: AsyncSession, setup_test_data)
         workspace_unique_id="ws_001",
         directory="/test/path",
         title="Count Empty Session",
-        time_created=int(time.time()),
-        time_updated=int(time.time())
+        gmt_create=int(time.time()),
+        gmt_modified=int(time.time())
     )
     db_session.add(new_session)
     await db_session.flush()
@@ -322,8 +324,8 @@ async def test_data_field_json_serialization(db_session: AsyncSession, setup_tes
     message = await repo.create(
         message_unique_id="msg_json_test",
         session_unique_id="sess_001",
-        time_created=current_time,
-        time_updated=current_time,
+        gmt_create=current_time,
+        gmt_modified=current_time,
         data=message_data
     )
     
@@ -350,8 +352,8 @@ async def test_update_message(db_session: AsyncSession, setup_test_data):
     message = await repo.create(
         message_unique_id="msg_update_test",
         session_unique_id="sess_001",
-        time_created=current_time,
-        time_updated=current_time,
+        gmt_create=current_time,
+        gmt_modified=current_time,
         data={"role": "user", "content": "Original content"}
     )
     
@@ -360,12 +362,12 @@ async def test_update_message(db_session: AsyncSession, setup_test_data):
     updated = await repo.update(
         message,
         data=json.dumps(new_data),
-        time_updated=current_time + 100
+        gmt_modified=current_time + 100
     )
     
     parsed_data = json.loads(updated.data)
     assert parsed_data["content"] == "Updated content"
-    assert updated.time_updated == current_time + 100
+    assert updated.gmt_modified == current_time + 100
 
 
 @pytest.mark.asyncio
@@ -378,8 +380,8 @@ async def test_delete_message(db_session: AsyncSession, setup_test_data):
     message = await repo.create(
         message_unique_id="msg_delete_test",
         session_unique_id="sess_001",
-        time_created=current_time,
-        time_updated=current_time,
+        gmt_create=current_time,
+        gmt_modified=current_time,
         data={"role": "user", "content": "To be deleted"}
     )
     

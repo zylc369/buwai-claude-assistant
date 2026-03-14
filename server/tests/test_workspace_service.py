@@ -30,11 +30,11 @@ async def sample_project(db_session: AsyncSession):
     """Create a sample project for testing."""
     project = Project(
         project_unique_id="proj-001",
-        worktree="/path/to/worktree",
+        directory="/path/to/worktree",
         branch="main",
         name="Test Project",
-        time_created=1000000,
-        time_updated=1000000
+        gmt_create=1000000,
+        gmt_modified=1000000
     )
     db_session.add(project)
     await db_session.commit()
@@ -46,11 +46,11 @@ async def sample_project2(db_session: AsyncSession):
     """Create a second sample project for testing."""
     project = Project(
         project_unique_id="proj-002",
-        worktree="/path/to/worktree2",
+        directory="/path/to/worktree2",
         branch="develop",
         name="Another Project",
-        time_created=1000000,
-        time_updated=1000000
+        gmt_create=1000000,
+        gmt_modified=1000000
     )
     db_session.add(project)
     await db_session.commit()
@@ -339,8 +339,8 @@ class TestWorkspaceServiceDelete:
             workspace_unique_id="ws-001",
             directory="/path/to/session",
             title="Test Session",
-            time_created=1000000,
-            time_updated=1000000
+            gmt_create=1000000,
+            gmt_modified=1000000
         )
         db_session.add(session)
         await db_session.commit()

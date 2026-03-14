@@ -38,8 +38,8 @@ class SessionResponse(BaseModel):
     workspace_unique_id: str
     directory: str
     title: str
-    time_created: int
-    time_updated: int
+    gmt_create: int
+    gmt_modified: int
     time_compacting: Optional[int] = None
     time_archived: Optional[int] = None
     

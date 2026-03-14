@@ -36,7 +36,7 @@ export function Sidebar() {
         project_unique_id: selectedProject.project_unique_id,
         name: newWorkspaceName.trim(),
         branch: newWorkspaceBranch.trim() || undefined,
-        directory: selectedProject.worktree,
+        directory: selectedProject.directory,
       });
       setIsCreateWorkspaceDialogOpen(false);
       setNewWorkspaceName("");
@@ -50,7 +50,7 @@ export function Sidebar() {
     if (!selectedWorkspace || !selectedProject) return;
 
     const externalSessionId = uuidv7();
-    const directory = selectedProject.worktree || selectedWorkspace.directory || "";
+    const directory = selectedProject.directory || selectedWorkspace.directory || "";
 
     try {
       const newSession = await createSession.mutateAsync({
@@ -115,6 +115,7 @@ export function Sidebar() {
               <button
                 key={workspace.id}
                 onClick={() => setSelectedWorkspace(workspace)}
+                title={workspace.directory || undefined}
                 className={cn(
                   "w-full flex items-center gap-2 rounded-md px-3 py-2 text-sm text-left",
                   "hover:bg-accent hover:text-accent-foreground",
@@ -173,7 +174,7 @@ export function Sidebar() {
                 <div className="flex-1 min-w-0">
                   <div className="text-sm truncate">{session.title}</div>
                   <div className="text-xs text-muted-foreground">
-                    {formatTime(session.time_updated)}
+                    {formatTime(session.gmt_modified)}
                   </div>
                 </div>
               </button>

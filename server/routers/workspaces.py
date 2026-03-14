@@ -1,6 +1,6 @@
 """Workspace API endpoints."""
 
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -38,6 +38,9 @@ class WorkspaceResponse(BaseModel):
     branch: str | None
     directory: str | None
     extra: str | None
+    gmt_create: int
+    gmt_modified: int
+    latest_active_time: Optional[int] = None
     
     class Config:
         from_attributes = True

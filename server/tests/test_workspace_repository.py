@@ -1,5 +1,7 @@
 """Tests for WorkspaceRepository."""
 
+import time
+
 import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
@@ -7,6 +9,18 @@ from sqlalchemy import select
 
 from database.models import Base, Project, Workspace
 from repositories.workspace_repository import WorkspaceRepository
+
+
+def create_test_workspace(**kwargs):
+    """Create a Workspace with required timestamp fields."""
+    current_time = int(time.time() * 1000)
+    defaults = {
+        'gmt_create': current_time,
+        'gmt_modified': current_time,
+        'latest_active_time': current_time,
+    }
+    defaults.update(kwargs)
+    return Workspace(**defaults)
 
 
 @pytest_asyncio.fixture
@@ -31,11 +45,11 @@ async def sample_project(db_session: AsyncSession):
     """Create a sample project for testing."""
     project = Project(
         project_unique_id="proj-001",
-        worktree="/path/to/worktree",
+        directory="/path/to/worktree",
         branch="main",
         name="Test Project",
-        time_created=1000000,
-        time_updated=1000000
+        gmt_create=1000000,
+        gmt_modified=1000000
     )
     db_session.add(project)
     await db_session.commit()
@@ -48,11 +62,11 @@ async def sample_project2(db_session: AsyncSession):
     """Create a second sample project for testing."""
     project = Project(
         project_unique_id="proj-002",
-        worktree="/path/to/worktree2",
+        directory="/path/to/worktree2",
         branch="develop",
         name="Another Project",
-        time_created=1000000,
-        time_updated=1000000
+        gmt_create=1000000,
+        gmt_modified=1000000
     )
     db_session.add(project)
     await db_session.commit()
@@ -70,13 +84,13 @@ class TestWorkspaceRepositoryGetByProjectUniqueId:
         repo = WorkspaceRepository(db_session)
 
         # Create workspaces
-        ws1 = Workspace(
+        ws1 = create_test_workspace(
             workspace_unique_id="ws-001",
             project_unique_id="proj-001",
             name="Workspace 1",
             branch="main"
         )
-        ws2 = Workspace(
+        ws2 = create_test_workspace(
             workspace_unique_id="ws-002",
             project_unique_id="proj-001",
             name="Workspace 2",
@@ -112,7 +126,7 @@ class TestWorkspaceRepositoryGetByUniqueId:
         """Test getting workspace by unique_id."""
         repo = WorkspaceRepository(db_session)
 
-        workspace = Workspace(
+        workspace = create_test_workspace(
             workspace_unique_id="ws-001",
             project_unique_id="proj-001",
             name="Test Workspace",
@@ -145,13 +159,13 @@ class TestWorkspaceRepositoryGetByName:
         """Test searching workspaces by name."""
         repo = WorkspaceRepository(db_session)
 
-        ws1 = Workspace(
+        ws1 = create_test_workspace(
             workspace_unique_id="ws-001",
             project_unique_id="proj-001",
             name="Development Workspace",
             branch="main"
         )
-        ws2 = Workspace(
+        ws2 = create_test_workspace(
             workspace_unique_id="ws-002",
             project_unique_id="proj-001",
             name="Production Workspace",
@@ -171,13 +185,13 @@ class TestWorkspaceRepositoryGetByName:
         """Test searching workspaces by name with project filter."""
         repo = WorkspaceRepository(db_session)
 
-        ws1 = Workspace(
+        ws1 = create_test_workspace(
             workspace_unique_id="ws-001",
             project_unique_id="proj-001",
             name="Test Workspace",
             branch="main"
         )
-        ws2 = Workspace(
+        ws2 = create_test_workspace(
             workspace_unique_id="ws-002",
             project_unique_id="proj-002",
             name="Test Workspace 2",
@@ -197,7 +211,7 @@ class TestWorkspaceRepositoryGetByName:
         """Test case-insensitive name search."""
         repo = WorkspaceRepository(db_session)
 
-        workspace = Workspace(
+        workspace = create_test_workspace(
             workspace_unique_id="ws-001",
             project_unique_id="proj-001",
             name="Test Workspace",
@@ -222,7 +236,7 @@ class TestWorkspaceRepositoryList:
         repo = WorkspaceRepository(db_session)
 
         for i in range(5):
-            ws = Workspace(
+            ws = create_test_workspace(
                 workspace_unique_id=f"ws-{i:03d}",
                 project_unique_id="proj-001",
                 name=f"Workspace {i}",
@@ -241,13 +255,13 @@ class TestWorkspaceRepositoryList:
         """Test list filters by project."""
         repo = WorkspaceRepository(db_session)
 
-        ws1 = Workspace(
+        ws1 = create_test_workspace(
             workspace_unique_id="ws-001",
             project_unique_id="proj-001",
             name="Workspace 1",
             branch="main"
         )
-        ws2 = Workspace(
+        ws2 = create_test_workspace(
             workspace_unique_id="ws-002",
             project_unique_id="proj-002",
             name="Workspace 2",
@@ -262,22 +276,23 @@ class TestWorkspaceRepositoryList:
 
 
 class TestWorkspaceRepositoryCRUD:
-    """Tests for basic CRUD operations."""
 
     @pytest.mark.asyncio
     async def test_create_workspace(
         self, db_session: AsyncSession, sample_project: Project
     ):
-        """Test creating a workspace."""
         repo = WorkspaceRepository(db_session)
 
-        workspace = Workspace(
+        current_time = int(time.time() * 1000)
+        created = await repo.create(
             workspace_unique_id="ws-001",
             project_unique_id="proj-001",
             name="New Workspace",
-            branch="main"
+            branch="main",
+            gmt_create=current_time,
+            gmt_modified=current_time,
+            latest_active_time=current_time
         )
-        created = await repo.create(workspace)
         await db_session.commit()
 
         assert created.id is not None
@@ -287,10 +302,9 @@ class TestWorkspaceRepositoryCRUD:
     async def test_update_workspace(
         self, db_session: AsyncSession, sample_project: Project
     ):
-        """Test updating a workspace."""
         repo = WorkspaceRepository(db_session)
 
-        workspace = Workspace(
+        workspace = create_test_workspace(
             workspace_unique_id="ws-001",
             project_unique_id="proj-001",
             name="Original Name",
@@ -308,10 +322,9 @@ class TestWorkspaceRepositoryCRUD:
     async def test_delete_workspace(
         self, db_session: AsyncSession, sample_project: Project
     ):
-        """Test deleting a workspace."""
         repo = WorkspaceRepository(db_session)
 
-        workspace = Workspace(
+        workspace = create_test_workspace(
             workspace_unique_id="ws-001",
             project_unique_id="proj-001",
             name="To Delete",
@@ -338,7 +351,7 @@ class TestWorkspaceRepositoryCount:
         repo = WorkspaceRepository(db_session)
 
         for i in range(3):
-            ws = Workspace(
+            ws = create_test_workspace(
                 workspace_unique_id=f"ws-{i:03d}",
                 project_unique_id="proj-001",
                 name=f"Workspace {i}",
@@ -361,7 +374,7 @@ class TestWorkspaceRepositoryExists:
         """Test checking if workspace exists."""
         repo = WorkspaceRepository(db_session)
 
-        workspace = Workspace(
+        workspace = create_test_workspace(
             workspace_unique_id="ws-001",
             project_unique_id="proj-001",
             name="Test Workspace",

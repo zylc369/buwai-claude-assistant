@@ -28,7 +28,7 @@ logger = get_logger(__name__)
 ENV_VAR_PATTERN = re.compile(r'\$\{([^}:]+)(?::([^}]*))?\}')
 
 # Known config section prefixes for env var overrides
-CONFIG_SECTIONS = {"SERVER", "DATABASE", "LOGGING"}
+CONFIG_SECTIONS = {"SERVER", "DATABASE", "LOGGING", "PROJECTS"}
 
 
 class CorsConfig(BaseModel):
@@ -124,6 +124,33 @@ class LoggingConfig(BaseModel):
         return v.upper()
 
 
+class ProjectsConfig(BaseModel):
+    """Projects directory configuration.
+    
+    Attributes:
+        root: Root directory for all projects (relative or absolute path).
+    """
+    root: str = "projectsRoot"
+    
+    @field_validator('root')
+    @classmethod
+    def validate_root(cls, v: str) -> str:
+        """Validate that root path is not empty.
+        
+        Args:
+            v: The root path value to validate.
+            
+        Returns:
+            The validated root path.
+            
+        Raises:
+            ValueError: If the root path is empty.
+        """
+        if not v or not v.strip():
+            raise ValueError("Projects root path cannot be empty")
+        return v.strip()
+
+
 class AppConfig(BaseModel):
     """Root application configuration.
     
@@ -134,10 +161,12 @@ class AppConfig(BaseModel):
         server: Server-related configuration settings.
         database: Database connection configuration.
         logging: Logging configuration settings.
+        projects: Projects directory configuration.
     """
     server: ServerConfig = Field(default_factory=ServerConfig)
     database: DatabaseConfig = Field(default_factory=DatabaseConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
+    projects: ProjectsConfig = Field(default_factory=ProjectsConfig)
 
 
 def interpolate_env_vars(value: Any) -> Any:
@@ -331,6 +360,8 @@ def print_config(config: AppConfig, config_path: Path) -> None:
     print(f"  dir: {config.logging.dir}", file=sys.stderr)
     print(f"  format: {config.logging.format}", file=sys.stderr)
     print(f"  date_format: {config.logging.date_format}", file=sys.stderr)
+    print("projects:", file=sys.stderr)
+    print(f"  root: {config.projects.root}", file=sys.stderr)
     print("=" * 60 + "\n", file=sys.stderr)
 
 
@@ -370,6 +401,7 @@ __all__ = [
     "DatabaseConfig",
     "CorsConfig",
     "LoggingConfig",
+    "ProjectsConfig",
     "get_config",
     "reset_config_cache",
     "load_config",

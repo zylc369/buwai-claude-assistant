@@ -56,12 +56,12 @@ class MessageUpdate(BaseModel):
 class MessageResponse(BaseModel):
     """Schema for message response."""
     model_config = ConfigDict(from_attributes=True)
-    
+
     id: int
     message_unique_id: str
     session_unique_id: str
-    time_created: int
-    time_updated: int
+    gmt_create: int
+    gmt_modified: int
     data: str
 
 

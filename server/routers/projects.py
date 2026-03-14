@@ -17,8 +17,8 @@ logger = get_logger(__name__)
 # Request/Response Models
 class ProjectCreate(BaseModel):
     """Schema for creating a project."""
-    project_unique_id: str = Field(..., description="Unique identifier for the project")
-    worktree: str = Field(..., description="Path to the worktree directory")
+    directory: str = Field(..., description="Directory name for the project (alphanumeric and underscores only)")
+    project_unique_id: Optional[str] = Field(None, description="Unique identifier for the project (auto-generated if not provided)")
     name: Optional[str] = Field(None, description="Optional project name")
     branch: Optional[str] = Field(None, description="Optional git branch name")
     time_initialized: Optional[int] = Field(None, description="Optional initialization timestamp")
@@ -26,7 +26,7 @@ class ProjectCreate(BaseModel):
 
 class ProjectUpdate(BaseModel):
     """Schema for updating a project."""
-    worktree: Optional[str] = Field(None, description="Path to the worktree directory")
+    directory: Optional[str] = Field(None, description="Path to the project directory")
     name: Optional[str] = Field(None, description="Project name")
     branch: Optional[str] = Field(None, description="Git branch name")
     time_initialized: Optional[int] = Field(None, description="Initialization timestamp")
@@ -36,12 +36,13 @@ class ProjectResponse(BaseModel):
     """Schema for project response."""
     id: int
     project_unique_id: str
-    worktree: str
+    directory: str
     branch: Optional[str]
     name: Optional[str]
     time_initialized: Optional[int]
-    time_created: int
-    time_updated: int
+    gmt_create: int
+    gmt_modified: int
+    latest_active_time: Optional[int] = None
     
     class Config:
         from_attributes = True
@@ -69,18 +70,19 @@ async def create_project(
 
     service = ProjectService(db)
 
-    existing = await service.get_project_by_unique_id(project_data.project_unique_id)
-    if existing:
-        logger.error(f"create_project failed: Project with unique_id '{project_data.project_unique_id}' already exists")
-        raise HTTPException(
-            status_code=400,
-            detail=f"Project with unique_id '{project_data.project_unique_id}' already exists"
-        )
+    if project_data.project_unique_id:
+        existing = await service.get_project_by_unique_id(project_data.project_unique_id)
+        if existing:
+            logger.error(f"create_project failed: Project with unique_id '{project_data.project_unique_id}' already exists")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Project with unique_id '{project_data.project_unique_id}' already exists"
+            )
 
     try:
         project = await service.create_project(
+            directory=project_data.directory,
             project_unique_id=project_data.project_unique_id,
-            worktree=project_data.worktree,
             name=project_data.name,
             branch=project_data.branch,
             time_initialized=project_data.time_initialized,

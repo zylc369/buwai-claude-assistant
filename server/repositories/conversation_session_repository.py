@@ -86,8 +86,8 @@ class ConversationSessionRepository(BaseRepository[Session]):
         directory: str,
         title: str,
         sdk_session_id: Optional[str] = None,
-        time_created: Optional[int] = None,
-        time_updated: Optional[int] = None,
+        gmt_create: Optional[int] = None,
+        gmt_modified: Optional[int] = None,
     ) -> Session:
         """Create a new session.
 
@@ -99,20 +99,20 @@ class ConversationSessionRepository(BaseRepository[Session]):
             directory: Session directory path.
             title: Session title.
             sdk_session_id: SDK session identifier (optional).
-            time_created: Creation timestamp (defaults to current time).
-            time_updated: Update timestamp (defaults to current time).
+            gmt_create: Creation timestamp (defaults to current time).
+            gmt_modified: Update timestamp (defaults to current time).
 
         Returns:
             Created Session instance.
         """
         try:
             logger.debug(f"create_session called with session_unique_id={session_unique_id}, project_unique_id={project_unique_id}, workspace_unique_id={workspace_unique_id}")
-            if time_created is None or time_updated is None:
+            if gmt_create is None or gmt_modified is None:
                 current_time = int(time.time())
-                if time_created is None:
-                    time_created = current_time
-                if time_updated is None:
-                    time_updated = current_time
+                if gmt_create is None:
+                    gmt_create = current_time
+                if gmt_modified is None:
+                    gmt_modified = current_time
 
             session = await self.create(
                 session_unique_id=session_unique_id,
@@ -122,8 +122,8 @@ class ConversationSessionRepository(BaseRepository[Session]):
                 directory=directory,
                 title=title,
                 sdk_session_id=sdk_session_id,
-                time_created=time_created,
-                time_updated=time_updated,
+                gmt_create=gmt_create,
+                gmt_modified=gmt_modified,
             )
             logger.debug(f"create_session returned session with id={session.id}")
             return session

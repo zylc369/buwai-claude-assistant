@@ -15,36 +15,36 @@ class TestProjectServiceCreate:
     async def test_create_project_minimal(self, db_session: AsyncSession):
         """Test creating a project with minimal required fields."""
         service = ProjectService(db_session)
-        
+
         before = int(time_module.time())
         project = await service.create_project(
             project_unique_id="proj-001",
-            worktree="/path/to/worktree",
+            directory="my_project_dir",
         )
-        
+
         assert project.id is not None
         assert project.project_unique_id == "proj-001"
-        assert project.worktree == "/path/to/worktree"
+        assert project.directory == "my_project_dir"
         assert project.name is None
         assert project.branch is None
         assert project.time_initialized is None
-        assert project.time_created >= before
-        assert project.time_updated >= before
+        assert project.gmt_create >= before
+        assert project.gmt_modified >= before
 
     @pytest.mark.asyncio
     async def test_create_project_with_all_fields(self, db_session: AsyncSession):
         """Test creating a project with all fields."""
         service = ProjectService(db_session)
         init_time = int(time_module.time()) - 1000
-        
+
         project = await service.create_project(
             project_unique_id="proj-002",
-            worktree="/path/to/worktree",
+            directory="my_project_dir",
             name="My Project",
             branch="main",
             time_initialized=init_time,
         )
-        
+
         assert project.project_unique_id == "proj-002"
         assert project.name == "My Project"
         assert project.branch == "main"
@@ -54,17 +54,43 @@ class TestProjectServiceCreate:
     async def test_create_project_auto_timestamps(self, db_session: AsyncSession):
         """Test that create_project auto-sets timestamps."""
         service = ProjectService(db_session)
-        
+
         before = int(time_module.time())
         project = await service.create_project(
             project_unique_id="proj-003",
-            worktree="/path/to/worktree",
+            directory="my_project_dir",
         )
         after = int(time_module.time())
-        
-        assert project.time_created >= before
-        assert project.time_created <= after
-        assert project.time_updated == project.time_created
+
+        assert project.gmt_create >= before
+        assert project.gmt_create <= after
+        assert project.gmt_modified == project.gmt_create
+
+    @pytest.mark.asyncio
+    async def test_create_project_auto_uuid(self, db_session: AsyncSession):
+        """Test that create_project auto-generates UUID if not provided."""
+        service = ProjectService(db_session)
+
+        project = await service.create_project(directory="auto_uuid_dir")
+
+        assert project.project_unique_id is not None
+        assert len(project.project_unique_id) == 36
+
+    @pytest.mark.asyncio
+    async def test_create_project_invalid_directory(self, db_session: AsyncSession):
+        """Test that create_project rejects invalid directory names."""
+        service = ProjectService(db_session)
+
+        with pytest.raises(ValueError, match="Invalid directory name"):
+            await service.create_project(directory="invalid-dir!")
+
+    @pytest.mark.asyncio
+    async def test_create_project_directory_with_spaces_fails(self, db_session: AsyncSession):
+        """Test that create_project rejects directory names with spaces."""
+        service = ProjectService(db_session)
+
+        with pytest.raises(ValueError, match="Invalid directory name"):
+            await service.create_project(directory="invalid dir")
 
 
 class TestProjectServiceGetById:
@@ -77,7 +103,7 @@ class TestProjectServiceGetById:
         
         created = await service.create_project(
             project_unique_id="proj-010",
-            worktree="/path/to/worktree",
+            directory="my_project_dir",
             name="Test Project",
         )
         
@@ -107,7 +133,7 @@ class TestProjectServiceGetByUniqueId:
         
         await service.create_project(
             project_unique_id="unique-proj-001",
-            worktree="/path/to/worktree",
+            directory="my_project_dir",
             name="Unique Project",
         )
         
@@ -137,7 +163,7 @@ class TestProjectServiceList:
         for i in range(5):
             await service.create_project(
                 project_unique_id=f"proj-list-{i:03d}",
-                worktree=f"/path/to/worktree{i}",
+                directory=f"project_dir_{i}",
             )
         
         results = await service.list_projects()
@@ -152,7 +178,7 @@ class TestProjectServiceList:
         for i in range(10):
             await service.create_project(
                 project_unique_id=f"proj-page-{i:03d}",
-                worktree=f"/path/to/worktree{i}",
+                directory=f"project_dir_{i}",
             )
         
         page1 = await service.list_projects(offset=0, limit=3)
@@ -171,17 +197,17 @@ class TestProjectServiceList:
         
         await service.create_project(
             project_unique_id="proj-filter-001",
-            worktree="/path/to/worktree1",
+            directory="project_dir_1",
             name="Alpha Project",
         )
         await service.create_project(
             project_unique_id="proj-filter-002",
-            worktree="/path/to/worktree2",
+            directory="project_dir_1",
             name="Beta Project",
         )
         await service.create_project(
             project_unique_id="proj-filter-003",
-            worktree="/path/to/worktree3",
+            directory="project_dir_2",
             name="Alpha App",
         )
         
@@ -200,7 +226,7 @@ class TestProjectServiceList:
         for i in range(10):
             await service.create_project(
                 project_unique_id=f"proj-pf-{i:03d}",
-                worktree=f"/path/to/worktree{i}",
+                directory=f"project_dir_{i}",
                 name=f"Test Project {i}",
             )
         
@@ -218,16 +244,16 @@ class TestProjectServiceUpdate:
         
         project = await service.create_project(
             project_unique_id="proj-update-001",
-            worktree="/path/to/worktree",
+            directory="my_project_dir",
             name="Original Name",
         )
-        original_updated = project.time_updated
-        
+        original_updated = project.gmt_modified
+
         updated = await service.update_project(project.id, name="Updated Name")
-        
+
         assert updated is not None
         assert updated.name == "Updated Name"
-        assert updated.time_updated >= original_updated
+        assert updated.gmt_modified >= original_updated
 
     @pytest.mark.asyncio
     async def test_update_multiple_fields(self, db_session: AsyncSession):
@@ -236,41 +262,41 @@ class TestProjectServiceUpdate:
         
         project = await service.create_project(
             project_unique_id="proj-update-002",
-            worktree="/original/path",
+            directory="original_dir",
             name="Original",
             branch="main",
         )
         
-        new_worktree = "/new/path"
+        new_directory = "new_dir"
         updated = await service.update_project(
             project.id,
-            worktree=new_worktree,
+            directory=new_directory,
             name="Updated",
             branch="develop",
         )
-        
-        assert updated.worktree == new_worktree
+
+        assert updated.directory == new_directory
         assert updated.name == "Updated"
         assert updated.branch == "develop"
 
     @pytest.mark.asyncio
-    async def test_update_auto_time_updated(self, db_session: AsyncSession):
-        """Test that update_project auto-updates time_updated."""
+    async def test_update_auto_gmt_modified(self, db_session: AsyncSession):
+        """Test that update_project auto-updates gmt_modified."""
         service = ProjectService(db_session)
         
         project = await service.create_project(
             project_unique_id="proj-update-003",
-            worktree="/path/to/worktree",
+            directory="my_project_dir",
         )
-        original_time = project.time_updated
-        
+        original_time = project.gmt_modified
+
         before = int(time_module.time())
         updated = await service.update_project(project.id, name="New Name")
         after = int(time_module.time())
-        
-        assert updated.time_updated >= original_time
-        assert updated.time_updated >= before
-        assert updated.time_updated <= after
+
+        assert updated.gmt_modified >= original_time
+        assert updated.gmt_modified >= before
+        assert updated.gmt_modified <= after
 
     @pytest.mark.asyncio
     async def test_update_not_found(self, db_session: AsyncSession):
@@ -292,7 +318,7 @@ class TestProjectServiceDelete:
         
         project = await service.create_project(
             project_unique_id="proj-delete-001",
-            worktree="/path/to/worktree",
+            directory="my_project_dir",
         )
         project_id = project.id
         
@@ -314,23 +340,26 @@ class TestProjectServiceDelete:
     async def test_delete_cascades_to_workspaces(self, db_session: AsyncSession):
         """Test that deleting a project cascades to related workspaces."""
         service = ProjectService(db_session)
-        
+
         project = await service.create_project(
             project_unique_id="proj-cascade-001",
-            worktree="/path/to/worktree",
+            directory="my_project_dir",
         )
-        
+
+        current_time = int(time_module.time())
         workspace = Workspace(
             workspace_unique_id="ws-cascade-001",
             project_unique_id="proj-cascade-001",
             name="Test Workspace",
             directory="/test/dir",
+            gmt_create=current_time,
+            gmt_modified=current_time,
         )
         db_session.add(workspace)
         await db_session.commit()
-        
+
         await service.delete_project(project.id)
-        
+
         from sqlalchemy import select
         result = await db_session.execute(
             select(Workspace).where(Workspace.workspace_unique_id == "ws-cascade-001")
@@ -341,22 +370,24 @@ class TestProjectServiceDelete:
     async def test_delete_cascades_to_sessions(self, db_session: AsyncSession):
         """Test that deleting a project cascades to related sessions."""
         service = ProjectService(db_session)
-        
+
         project = await service.create_project(
             project_unique_id="proj-cascade-002",
-            worktree="/path/to/worktree",
+            directory="my_project_dir",
         )
-        
+
+        current_time = int(time_module.time())
         workspace = Workspace(
             workspace_unique_id="ws-cascade-002",
             project_unique_id="proj-cascade-002",
             name="Test Workspace",
             directory="/test/dir",
+            gmt_create=current_time,
+            gmt_modified=current_time,
         )
         db_session.add(workspace)
         await db_session.flush()
-        
-        current_time = int(time_module.time())
+
         session = Session(
             session_unique_id="sess-cascade-001",
             external_session_id="external-sess-cascade-001",
@@ -364,14 +395,14 @@ class TestProjectServiceDelete:
             workspace_unique_id="ws-cascade-002",
             directory="/test/dir",
             title="Test Session",
-            time_created=current_time,
-            time_updated=current_time,
+            gmt_create=current_time,
+            gmt_modified=current_time,
         )
         db_session.add(session)
         await db_session.commit()
-        
+
         await service.delete_project(project.id)
-        
+
         from sqlalchemy import select
         result = await db_session.execute(
             select(Session).where(Session.session_unique_id == "sess-cascade-001")
@@ -382,22 +413,24 @@ class TestProjectServiceDelete:
     async def test_delete_cascades_to_messages(self, db_session: AsyncSession):
         """Test that deleting a project cascades to related messages."""
         service = ProjectService(db_session)
-        
+
         project = await service.create_project(
             project_unique_id="proj-cascade-003",
-            worktree="/path/to/worktree",
+            directory="my_project_dir",
         )
-        
+
+        current_time = int(time_module.time())
         workspace = Workspace(
             workspace_unique_id="ws-cascade-003",
             project_unique_id="proj-cascade-003",
             name="Test Workspace",
             directory="/test/dir",
+            gmt_create=current_time,
+            gmt_modified=current_time,
         )
         db_session.add(workspace)
         await db_session.flush()
-        
-        current_time = int(time_module.time())
+
         session = Session(
             session_unique_id="sess-cascade-002",
             external_session_id="external-sess-cascade-002",
@@ -405,24 +438,24 @@ class TestProjectServiceDelete:
             workspace_unique_id="ws-cascade-003",
             directory="/test/dir",
             title="Test Session",
-            time_created=current_time,
-            time_updated=current_time,
+            gmt_create=current_time,
+            gmt_modified=current_time,
         )
         db_session.add(session)
         await db_session.flush()
-        
+
         message = Message(
             message_unique_id="msg-cascade-001",
             session_unique_id="sess-cascade-002",
-            time_created=current_time,
-            time_updated=current_time,
+            gmt_create=current_time,
+            gmt_modified=current_time,
             data='{"content": "test message"}',
         )
         db_session.add(message)
         await db_session.commit()
-        
+
         await service.delete_project(project.id)
-        
+
         from sqlalchemy import select
         result = await db_session.execute(
             select(Message).where(Message.message_unique_id == "msg-cascade-001")

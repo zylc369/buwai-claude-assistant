@@ -93,11 +93,11 @@ async def setup_test_data(db_session: AsyncSession):
     
     project = Project(
         project_unique_id="proj_msg_001",
-        worktree="/test/path",
+        directory="/test/path",
         branch="main",
         name="Test Project",
-        time_created=current_time,
-        time_updated=current_time
+        gmt_create=current_time,
+        gmt_modified=current_time
     )
     db_session.add(project)
     await db_session.flush()
@@ -107,7 +107,9 @@ async def setup_test_data(db_session: AsyncSession):
         branch="main",
         name="Test Workspace",
         directory="/test/path",
-        project_unique_id="proj_msg_001"
+        project_unique_id="proj_msg_001",
+        gmt_create=current_time,
+        gmt_modified=current_time
     )
     db_session.add(workspace)
     await db_session.flush()
@@ -119,8 +121,8 @@ async def setup_test_data(db_session: AsyncSession):
         workspace_unique_id="ws_msg_001",
         directory="/test/path",
         title="Test Session",
-        time_created=current_time,
-        time_updated=current_time
+        gmt_create=current_time,
+        gmt_modified=current_time
     )
     db_session.add(session)
     await db_session.flush()
@@ -139,8 +141,8 @@ async def test_message(db_session: AsyncSession, setup_test_data):
     message = Message(
         message_unique_id="msg_test_001",
         session_unique_id="sess_msg_001",
-        time_created=current_time,
-        time_updated=current_time,
+        gmt_create=current_time,
+        gmt_modified=current_time,
         data=json.dumps({"role": "user", "content": "Hello test"})
     )
     db_session.add(message)
@@ -175,8 +177,8 @@ class TestListMessages:
             workspace_unique_id="ws_msg_001",
             directory="/test/path",
             title="Empty Session",
-            time_created=current_time,
-            time_updated=current_time
+            gmt_create=current_time,
+            gmt_modified=current_time
         )
         db_session.add(new_session)
         await db_session.flush()
@@ -204,8 +206,8 @@ class TestListMessages:
             msg = Message(
                 message_unique_id=f"msg_page_{i}",
                 session_unique_id="sess_msg_001",
-                time_created=current_time + i,
-                time_updated=current_time + i,
+                gmt_create=current_time + i,
+                gmt_modified=current_time + i,
                 data=json.dumps({"role": "user", "content": f"Message {i}"})
             )
             db_session.add(msg)

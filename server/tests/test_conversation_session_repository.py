@@ -19,11 +19,11 @@ async def create_test_project_and_workspace(
     
     project = Project(
         project_unique_id=project_unique_id,
-        worktree="/path/to/worktree",
+        directory="/path/to/worktree",
         name=f"Project {project_unique_id}",
         time_initialized=current_time,
-        time_created=current_time,
-        time_updated=current_time,
+        gmt_create=current_time,
+        gmt_modified=current_time,
     )
     db_session.add(project)
     await db_session.flush()
@@ -33,6 +33,8 @@ async def create_test_project_and_workspace(
         project_unique_id=project_unique_id,
         name=f"Workspace {workspace_unique_id}",
         directory="/test/dir",
+        gmt_create=current_time,
+        gmt_modified=current_time,
     )
     db_session.add(workspace)
     await db_session.flush()
@@ -59,8 +61,8 @@ async def create_test_session(
         workspace_unique_id=workspace_unique_id,
         directory=directory,
         title=title or f"Session {session_unique_id}",
-        time_created=current_time,
-        time_updated=current_time,
+        gmt_create=current_time,
+        gmt_modified=current_time,
         time_archived=time_archived,
     )
 
@@ -537,11 +539,14 @@ class TestConversationSessionRepositoryList:
             workspace_unique_id="ws-ws-filter-001",
         )
         # Create another workspace for the same project
+        current_time = int(time.time())
         workspace2 = Workspace(
             workspace_unique_id="ws-ws-filter-002",
             project_unique_id="proj-ws-filter",
             name="Workspace 2",
             directory="/test/dir2",
+            gmt_create=current_time,
+            gmt_modified=current_time,
         )
         db_session.add(workspace2)
         await db_session.flush()
@@ -922,13 +927,13 @@ class TestConversationSessionRepositoryUpdate:
             session,
             title="Updated",
             directory="/new/path",
-            time_updated=new_time,
+            gmt_modified=new_time,
         )
         await db_session.commit()
         
         assert updated.title == "Updated"
         assert updated.directory == "/new/path"
-        assert updated.time_updated == new_time
+        assert updated.gmt_modified == new_time
 
 
 class TestConversationSessionRepositoryDelete:
@@ -1053,8 +1058,8 @@ class TestConversationSessionRepositoryCreateWithSdkSessionId:
             directory="/test/sdk/dir",
             title="SDK Session",
             sdk_session_id="sdk-session-12345",
-            time_created=current_time,
-            time_updated=current_time,
+            gmt_create=current_time,
+            gmt_modified=current_time,
         )
         await db_session.commit()
         

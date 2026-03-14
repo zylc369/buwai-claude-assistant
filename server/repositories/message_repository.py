@@ -53,7 +53,7 @@ class MessageRepository(BaseRepository[Message]):
             result = await self.session.execute(
                 select(Message)
                 .where(Message.session_unique_id == session_unique_id)
-                .order_by(Message.time_created)
+                .order_by(Message.gmt_create)
                 .offset(offset)
                 .limit(limit)
             )
@@ -110,8 +110,8 @@ class MessageRepository(BaseRepository[Message]):
         self,
         message_unique_id: str,
         session_unique_id: str,
-        time_created: int,
-        time_updated: int,
+        gmt_create: int,
+        gmt_modified: int,
         data: Dict[str, Any]
     ) -> Message:
         """Create a new message with JSON data.
@@ -119,21 +119,21 @@ class MessageRepository(BaseRepository[Message]):
         Args:
             message_unique_id: The unique identifier for the message.
             session_unique_id: The unique identifier of the parent session.
-            time_created: Creation timestamp (Unix epoch).
-            time_updated: Update timestamp (Unix epoch).
+            gmt_create: Creation timestamp (Unix epoch).
+            gmt_modified: Update timestamp (Unix epoch).
             data: Message data dictionary (will be stored as JSON string).
             
         Returns:
             Created message instance.
         """
         try:
-            logger.debug(f"create called with message_unique_id={message_unique_id}, session_unique_id={session_unique_id}, time_created={time_created}, time_updated={time_updated}")
+            logger.debug(f"create called with message_unique_id={message_unique_id}, session_unique_id={session_unique_id}, gmt_create={gmt_create}, gmt_modified={gmt_modified}")
             instance = self.model(
                 message_unique_id=message_unique_id,
                 session_unique_id=session_unique_id,
-                time_created=time_created,
-                time_updated=time_updated,
-                data=json.dumps(data) if isinstance(data, dict) else data
+                gmt_create=gmt_create,
+                gmt_modified=gmt_modified,
+                data=json.dumps(data, ensure_ascii=False) if isinstance(data, dict) else data
             )
             self.session.add(instance)
             await self.session.flush()
@@ -157,7 +157,7 @@ class MessageRepository(BaseRepository[Message]):
             limit: Maximum number of results (default: 100).
             
         Returns:
-            List of messages with id > last_message_id, ordered by time_created.
+            List of messages with id > last_message_id, ordered by gmt_create.
         """
         try:
             logger.debug(f"get_messages_after_id called with session_unique_id={session_unique_id}, last_message_id={last_message_id}, limit={limit}")
@@ -165,7 +165,7 @@ class MessageRepository(BaseRepository[Message]):
                 select(Message)
                 .where(Message.session_unique_id == session_unique_id)
                 .where(Message.id > last_message_id)
-                .order_by(Message.time_created)
+                .order_by(Message.gmt_create)
                 .limit(limit)
             )
             messages = list(result.scalars().all())
