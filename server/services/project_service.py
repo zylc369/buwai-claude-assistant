@@ -75,7 +75,7 @@ class ProjectService:
                 f"Directory already exists: {full_path}"
             )
         try:
-            os.mkdir(full_path)
+            full_path.mkdir(parents=True, exist_ok=False)
             logger.info(f"Created project directory: {full_path}")
             return full_path
         except OSError as e:
