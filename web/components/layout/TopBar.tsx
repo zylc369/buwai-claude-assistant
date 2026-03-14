@@ -25,12 +25,12 @@ export function TopBar() {
   };
 
   const handleCreateProject = async () => {
-    if (!newProjectName.trim()) return;
+    if (!newProjectName.trim() || !newProjectDirectory.trim()) return;
 
     try {
       const project = await createProject.mutateAsync({
         project_unique_id: crypto.randomUUID(),
-        directory: newProjectDirectory.trim() || null,
+        directory: newProjectDirectory.trim(),
         name: newProjectName.trim(),
       });
       setSelectedProject(project);
@@ -168,12 +168,12 @@ export function TopBar() {
 
                     <div>
                       <label className="text-sm font-medium mb-1.5 block">
-                        Directory Name <span className="text-muted-foreground">(Optional)</span>
+                        Directory Name
                       </label>
                       <Input
                         value={newProjectDirectory}
                         onChange={(e) => setNewProjectDirectory(e.target.value)}
-                        placeholder="my_project_dir"
+                        placeholder="my-project-dir"
                         className="w-full"
                       />
                     </div>
@@ -188,7 +188,7 @@ export function TopBar() {
                     </Button>
                     <Button
                       onClick={handleCreateProject}
-                      disabled={!newProjectName.trim() || createProject.isPending}
+                      disabled={!newProjectName.trim() || !newProjectDirectory.trim() || createProject.isPending}
                     >
                       {createProject.isPending ? "Creating..." : "Create"}
                     </Button>

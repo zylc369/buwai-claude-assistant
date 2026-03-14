@@ -17,14 +17,12 @@ logger = get_logger(__name__)
 class WorkspaceCreate(BaseModel):
     workspace_unique_id: str
     project_unique_id: str
-    name: str | None = None
     branch: str | None = None
-    directory: str | None = None
+    directory: str
     extra: str | None = None
 
 
 class WorkspaceUpdate(BaseModel):
-    name: str | None = None
     branch: str | None = None
     directory: str | None = None
     extra: str | None = None
@@ -34,9 +32,8 @@ class WorkspaceResponse(BaseModel):
     id: int
     workspace_unique_id: str
     project_unique_id: str
-    name: str | None
     branch: str | None
-    directory: str | None
+    directory: str
     extra: str | None
     gmt_create: int
     gmt_modified: int
@@ -60,7 +57,6 @@ async def create_workspace(
     workspace = await service.create_workspace(
         workspace_unique_id=workspace_data.workspace_unique_id,
         project_unique_id=workspace_data.project_unique_id,
-        name=workspace_data.name,
         branch=workspace_data.branch,
         directory=workspace_data.directory,
         extra=workspace_data.extra

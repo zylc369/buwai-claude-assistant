@@ -14,7 +14,7 @@ Base = declarative_base()
 
 
 # Directory name pattern for validation
-DIRECTORY_PATTERN = re.compile(r'^[0-9a-zA-Z_]+$')
+DIRECTORY_PATTERN = re.compile(r'^[0-9a-zA-Z_-]{1,}$')
 
 
 class Project(Base):
@@ -24,13 +24,12 @@ class Project(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     project_unique_id = Column(Text, unique=True, nullable=False)
-    directory = Column(Text, nullable=False)  # Renamed from worktree
+    directory = Column(Text, nullable=False)
     branch = Column(Text, nullable=True)
-    name = Column(Text, nullable=True)
-    time_initialized = Column(Integer, nullable=True)
-    gmt_create = Column(Integer, nullable=False)  # Renamed from time_created
-    gmt_modified = Column(Integer, nullable=False)  # Renamed from time_updated
-    latest_active_time = Column(Integer, nullable=True)  # NEW
+    name = Column(Text, nullable=False)
+    gmt_create = Column(Integer, nullable=False)
+    gmt_modified = Column(Integer, nullable=False)
+    latest_active_time = Column(Integer, nullable=True)
 
     workspaces = relationship("Workspace", back_populates="project", cascade="all, delete-orphan")
     sessions = relationship("Session", back_populates="project", cascade="all, delete-orphan")
@@ -44,17 +43,16 @@ class Workspace(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     workspace_unique_id = Column(Text, unique=True, nullable=False)
     branch = Column(Text, nullable=True)
-    name = Column(Text, nullable=True)
-    directory = Column(Text, nullable=True)
+    directory = Column(Text, nullable=False)
     extra = Column(Text, nullable=True)
     project_unique_id = Column(
         Text,
         ForeignKey("project.project_unique_id", ondelete="CASCADE"),
         nullable=False,
     )
-    gmt_create = Column(Integer, nullable=False)  # NEW
-    gmt_modified = Column(Integer, nullable=False)  # NEW
-    latest_active_time = Column(Integer, nullable=True)  # NEW
+    gmt_create = Column(Integer, nullable=False)
+    gmt_modified = Column(Integer, nullable=False)
+    latest_active_time = Column(Integer, nullable=True)
 
     project = relationship("Project", back_populates="workspaces")
     sessions = relationship("Session", back_populates="workspace", cascade="all, delete-orphan")

@@ -69,7 +69,8 @@ class TestWorkspaceServiceCreate:
 
         workspace = await service.create_workspace(
             workspace_unique_id="ws-001",
-            project_unique_id="proj-001"
+            project_unique_id="proj-001",
+            directory="/test/workspace"
         )
 
         assert workspace.id is not None
@@ -86,7 +87,6 @@ class TestWorkspaceServiceCreate:
         workspace = await service.create_workspace(
             workspace_unique_id="ws-001",
             project_unique_id="proj-001",
-            name="Development Workspace",
             branch="feature/test",
             directory="/path/to/workspace",
             extra='{"key": "value"}'
@@ -94,7 +94,6 @@ class TestWorkspaceServiceCreate:
 
         assert workspace.id is not None
         assert workspace.workspace_unique_id == "ws-001"
-        assert workspace.name == "Development Workspace"
         assert workspace.branch == "feature/test"
         assert workspace.directory == "/path/to/workspace"
         assert workspace.extra == '{"key": "value"}'
@@ -113,7 +112,7 @@ class TestWorkspaceServiceGetById:
         created = await service.create_workspace(
             workspace_unique_id="ws-001",
             project_unique_id="proj-001",
-            name="Test Workspace"
+            directory="/test/workspace"
         )
 
         found = await service.get_workspace_by_id(created.id)
@@ -145,14 +144,13 @@ class TestWorkspaceServiceGetByUniqueId:
         await service.create_workspace(
             workspace_unique_id="ws-001",
             project_unique_id="proj-001",
-            name="Test Workspace"
+            directory="test-workspace"
         )
 
         found = await service.get_workspace_by_unique_id("ws-001")
 
         assert found is not None
         assert found.workspace_unique_id == "ws-001"
-        assert found.name == "Test Workspace"
 
     @pytest.mark.asyncio
     async def test_get_workspace_by_unique_id_not_found(
@@ -179,12 +177,12 @@ class TestWorkspaceServiceList:
         await service.create_workspace(
             workspace_unique_id="ws-001",
             project_unique_id="proj-001",
-            name="Workspace 1"
+            directory="/test/workspace1"
         )
         await service.create_workspace(
             workspace_unique_id="ws-002",
             project_unique_id="proj-001",
-            name="Workspace 2"
+            directory="workspace2"
         )
 
         workspaces = await service.list_workspaces("proj-001")
@@ -215,12 +213,12 @@ class TestWorkspaceServiceList:
         await service.create_workspace(
             workspace_unique_id="ws-001",
             project_unique_id="proj-001",
-            name="Workspace 1"
+            directory="/test/workspace1"
         )
         await service.create_workspace(
             workspace_unique_id="ws-002",
             project_unique_id="proj-002",
-            name="Workspace 2"
+            directory="workspace2"
         )
 
         workspaces = await service.list_workspaces("proj-001")
@@ -239,7 +237,7 @@ class TestWorkspaceServiceList:
             await service.create_workspace(
                 workspace_unique_id=f"ws-{i:03d}",
                 project_unique_id="proj-001",
-                name=f"Workspace {i}"
+                directory=f"workspace{i}"
             )
 
         page1 = await service.list_workspaces("proj-001", offset=0, limit=2)
@@ -264,17 +262,15 @@ class TestWorkspaceServiceUpdate:
         created = await service.create_workspace(
             workspace_unique_id="ws-001",
             project_unique_id="proj-001",
-            name="Original Name"
+            directory="test-workspace"
         )
 
         updated = await service.update_workspace(
             created.id,
-            name="Updated Name",
             branch="new-branch"
         )
 
         assert updated is not None
-        assert updated.name == "Updated Name"
         assert updated.branch == "new-branch"
 
     @pytest.mark.asyncio
@@ -300,7 +296,7 @@ class TestWorkspaceServiceDelete:
         created = await service.create_workspace(
             workspace_unique_id="ws-001",
             project_unique_id="proj-001",
-            name="To Delete"
+            directory="/test/workspace"
         )
 
         result = await service.delete_workspace(created.id)
@@ -329,7 +325,7 @@ class TestWorkspaceServiceDelete:
         workspace = await service.create_workspace(
             workspace_unique_id="ws-001",
             project_unique_id="proj-001",
-            name="Test Workspace"
+            directory="test-workspace"
         )
 
         session = Session(
@@ -337,7 +333,7 @@ class TestWorkspaceServiceDelete:
             external_session_id="external-sess-001",
             project_unique_id="proj-001",
             workspace_unique_id="ws-001",
-            directory="/path/to/session",
+            directory="test-workspace",
             title="Test Session",
             gmt_create=1000000,
             gmt_modified=1000000
@@ -366,18 +362,18 @@ class TestWorkspaceServiceSearch:
         await service.create_workspace(
             workspace_unique_id="ws-001",
             project_unique_id="proj-001",
-            name="Development Workspace"
+            directory="workspace1"
         )
         await service.create_workspace(
             workspace_unique_id="ws-002",
             project_unique_id="proj-001",
-            name="Production Workspace"
+            directory="workspace2"
         )
 
-        results = await service.search_workspaces("Development")
+        results = await service.search_workspaces("workspace1")
 
         assert len(results) == 1
-        assert results[0].name == "Development Workspace"
+        assert results[0].directory == "workspace1"
 
     @pytest.mark.asyncio
     async def test_search_workspaces_case_insensitive(
@@ -389,13 +385,13 @@ class TestWorkspaceServiceSearch:
         await service.create_workspace(
             workspace_unique_id="ws-001",
             project_unique_id="proj-001",
-            name="Test Workspace"
+            directory="test-workspace"
         )
 
-        results = await service.search_workspaces("TEST")
+        results = await service.search_workspaces("WORKSPACE")
 
         assert len(results) == 1
-        assert results[0].name == "Test Workspace"
+        assert results[0].directory == "test-workspace"
 
     @pytest.mark.asyncio
     async def test_search_workspaces_with_project_filter(
@@ -410,15 +406,15 @@ class TestWorkspaceServiceSearch:
         await service.create_workspace(
             workspace_unique_id="ws-001",
             project_unique_id="proj-001",
-            name="Test Workspace"
+            directory="workspace1"
         )
         await service.create_workspace(
             workspace_unique_id="ws-002",
             project_unique_id="proj-002",
-            name="Another Test"
+            directory="workspace2"
         )
 
-        results = await service.search_workspaces("Test", project_unique_id="proj-001")
+        results = await service.search_workspaces("workspace1", project_unique_id="proj-001")
 
         assert len(results) == 1
         assert results[0].project_unique_id == "proj-001"
@@ -433,10 +429,10 @@ class TestWorkspaceServiceSearch:
         await service.create_workspace(
             workspace_unique_id="ws-001",
             project_unique_id="proj-001",
-            name="Development Workspace"
+            directory="test-workspace"
         )
 
-        results = await service.search_workspaces("Work")
+        results = await service.search_workspaces("work")
 
         assert len(results) == 1
-        assert results[0].name == "Development Workspace"
+        assert results[0].directory == "test-workspace"

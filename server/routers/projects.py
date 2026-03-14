@@ -17,11 +17,10 @@ logger = get_logger(__name__)
 # Request/Response Models
 class ProjectCreate(BaseModel):
     """Schema for creating a project."""
-    directory: str = Field(..., description="Directory name for the project (alphanumeric and underscores only)")
+    directory: str = Field(..., description="Directory name for the project (alphanumeric, underscores, and hyphens)")
     project_unique_id: Optional[str] = Field(None, description="Unique identifier for the project (auto-generated if not provided)")
-    name: Optional[str] = Field(None, description="Optional project name")
+    name: str = Field(..., description="Project name (required)")
     branch: Optional[str] = Field(None, description="Optional git branch name")
-    time_initialized: Optional[int] = Field(None, description="Optional initialization timestamp")
 
 
 class ProjectUpdate(BaseModel):
@@ -29,7 +28,6 @@ class ProjectUpdate(BaseModel):
     directory: Optional[str] = Field(None, description="Path to the project directory")
     name: Optional[str] = Field(None, description="Project name")
     branch: Optional[str] = Field(None, description="Git branch name")
-    time_initialized: Optional[int] = Field(None, description="Initialization timestamp")
 
 
 class ProjectResponse(BaseModel):
@@ -38,8 +36,7 @@ class ProjectResponse(BaseModel):
     project_unique_id: str
     directory: str
     branch: Optional[str]
-    name: Optional[str]
-    time_initialized: Optional[int]
+    name: str
     gmt_create: int
     gmt_modified: int
     latest_active_time: Optional[int] = None
@@ -85,7 +82,6 @@ async def create_project(
             project_unique_id=project_data.project_unique_id,
             name=project_data.name,
             branch=project_data.branch,
-            time_initialized=project_data.time_initialized,
         )
         logger.info(f"create_project completed: status=201")
         return project

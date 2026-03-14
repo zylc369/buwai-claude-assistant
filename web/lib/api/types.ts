@@ -11,8 +11,7 @@ export interface Project {
   project_unique_id: string;
   directory: string;
   branch: string | null;
-  name: string | null;
-  time_initialized: number | null;
+  name: string;
   gmt_create: number;
   gmt_modified: number;
   latest_active_time: number | null;
@@ -20,17 +19,15 @@ export interface Project {
 
 export interface CreateProjectRequest {
   project_unique_id: string;
-  directory: string | null;
-  name?: string | null;
+  directory: string;
+  name: string;
   branch?: string | null;
-  time_initialized?: number | null;
 }
 
 export interface UpdateProjectRequest {
   directory?: string;
-  name?: string | null;
+  name?: string;
   branch?: string | null;
-  time_initialized?: number | null;
 }
 
 export interface ListProjectsParams {
@@ -47,9 +44,8 @@ export interface Workspace {
   id: number;
   workspace_unique_id: string;
   project_unique_id: string;
-  name: string | null;
   branch: string | null;
-  directory: string | null;
+  directory: string;
   extra: string | null;
   gmt_create: number;
   gmt_modified: number;
@@ -59,16 +55,14 @@ export interface Workspace {
 export interface CreateWorkspaceRequest {
   workspace_unique_id: string;
   project_unique_id: string;
-  name?: string | null;
   branch?: string | null;
-  directory?: string | null;
+  directory: string;
   extra?: string | null;
 }
 
 export interface UpdateWorkspaceRequest {
-  name?: string | null;
   branch?: string | null;
-  directory?: string | null;
+  directory?: string;
   extra?: string | null;
 }
 

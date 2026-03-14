@@ -20,14 +20,14 @@ class TestProjectServiceCreate:
         project = await service.create_project(
             project_unique_id="proj-001",
             directory="my_project_dir",
+            name="Minimal Project",
         )
 
         assert project.id is not None
         assert project.project_unique_id == "proj-001"
         assert project.directory == "my_project_dir"
-        assert project.name is None
+        assert project.name == "Minimal Project"
         assert project.branch is None
-        assert project.time_initialized is None
         assert project.gmt_create >= before
         assert project.gmt_modified >= before
 
@@ -35,20 +35,17 @@ class TestProjectServiceCreate:
     async def test_create_project_with_all_fields(self, db_session: AsyncSession):
         """Test creating a project with all fields."""
         service = ProjectService(db_session)
-        init_time = int(time_module.time()) - 1000
 
         project = await service.create_project(
             project_unique_id="proj-002",
             directory="my_project_dir",
             name="My Project",
             branch="main",
-            time_initialized=init_time,
         )
 
         assert project.project_unique_id == "proj-002"
         assert project.name == "My Project"
         assert project.branch == "main"
-        assert project.time_initialized == init_time
 
     @pytest.mark.asyncio
     async def test_create_project_auto_timestamps(self, db_session: AsyncSession):
@@ -59,6 +56,7 @@ class TestProjectServiceCreate:
         project = await service.create_project(
             project_unique_id="proj-003",
             directory="my_project_dir",
+            name="Auto Timestamps Project",
         )
         after = int(time_module.time())
 
@@ -71,7 +69,7 @@ class TestProjectServiceCreate:
         """Test that create_project auto-generates UUID if not provided."""
         service = ProjectService(db_session)
 
-        project = await service.create_project(directory="auto_uuid_dir")
+        project = await service.create_project(directory="auto_uuid_dir", name="Auto UUID Project")
 
         assert project.project_unique_id is not None
         assert len(project.project_unique_id) == 36
@@ -82,7 +80,7 @@ class TestProjectServiceCreate:
         service = ProjectService(db_session)
 
         with pytest.raises(ValueError, match="Invalid directory name"):
-            await service.create_project(directory="invalid-dir!")
+            await service.create_project(directory="invalid-dir!", name="Test Project")
 
     @pytest.mark.asyncio
     async def test_create_project_directory_with_spaces_fails(self, db_session: AsyncSession):
@@ -90,7 +88,7 @@ class TestProjectServiceCreate:
         service = ProjectService(db_session)
 
         with pytest.raises(ValueError, match="Invalid directory name"):
-            await service.create_project(directory="invalid dir")
+            await service.create_project(directory="invalid dir", name="Test Project")
 
 
 class TestProjectServiceGetById:
@@ -159,34 +157,36 @@ class TestProjectServiceList:
     async def test_list_all_projects(self, db_session: AsyncSession):
         """Test listing all projects."""
         service = ProjectService(db_session)
-        
+
         for i in range(5):
             await service.create_project(
                 project_unique_id=f"proj-list-{i:03d}",
                 directory=f"project_dir_{i}",
+                name=f"List Project {i}",
             )
-        
+
         results = await service.list_projects()
-        
+
         assert len(results) == 5
 
     @pytest.mark.asyncio
     async def test_list_with_pagination(self, db_session: AsyncSession):
         """Test listing projects with pagination."""
         service = ProjectService(db_session)
-        
+
         for i in range(10):
             await service.create_project(
                 project_unique_id=f"proj-page-{i:03d}",
                 directory=f"project_dir_{i}",
+                name=f"Page Project {i}",
             )
-        
+
         page1 = await service.list_projects(offset=0, limit=3)
         assert len(page1) == 3
-        
+
         page2 = await service.list_projects(offset=3, limit=3)
         assert len(page2) == 3
-        
+
         last = await service.list_projects(offset=9, limit=3)
         assert len(last) == 1
 
@@ -222,14 +222,14 @@ class TestProjectServiceList:
     async def test_list_with_pagination_and_filter(self, db_session: AsyncSession):
         """Test listing projects with pagination and filter combined."""
         service = ProjectService(db_session)
-        
+
         for i in range(10):
             await service.create_project(
                 project_unique_id=f"proj-pf-{i:03d}",
                 directory=f"project_dir_{i}",
                 name=f"Test Project {i}",
             )
-        
+
         results = await service.list_projects(offset=0, limit=2, name="Test")
         assert len(results) == 2
 
@@ -283,10 +283,11 @@ class TestProjectServiceUpdate:
     async def test_update_auto_gmt_modified(self, db_session: AsyncSession):
         """Test that update_project auto-updates gmt_modified."""
         service = ProjectService(db_session)
-        
+
         project = await service.create_project(
             project_unique_id="proj-update-003",
             directory="my_project_dir",
+            name="Original Name",
         )
         original_time = project.gmt_modified
 
@@ -315,15 +316,16 @@ class TestProjectServiceDelete:
     async def test_delete_project(self, db_session: AsyncSession):
         """Test deleting a project."""
         service = ProjectService(db_session)
-        
+
         project = await service.create_project(
             project_unique_id="proj-delete-001",
             directory="my_project_dir",
+            name="Delete Project",
         )
         project_id = project.id
-        
+
         result = await service.delete_project(project_id)
-        
+
         assert result is True
         assert await service.get_project_by_id(project_id) is None
 
@@ -344,13 +346,13 @@ class TestProjectServiceDelete:
         project = await service.create_project(
             project_unique_id="proj-cascade-001",
             directory="my_project_dir",
+            name="Cascade Project",
         )
 
         current_time = int(time_module.time())
         workspace = Workspace(
             workspace_unique_id="ws-cascade-001",
             project_unique_id="proj-cascade-001",
-            name="Test Workspace",
             directory="/test/dir",
             gmt_create=current_time,
             gmt_modified=current_time,
@@ -374,13 +376,13 @@ class TestProjectServiceDelete:
         project = await service.create_project(
             project_unique_id="proj-cascade-002",
             directory="my_project_dir",
+            name="Cascade Project 2",
         )
 
         current_time = int(time_module.time())
         workspace = Workspace(
             workspace_unique_id="ws-cascade-002",
             project_unique_id="proj-cascade-002",
-            name="Test Workspace",
             directory="/test/dir",
             gmt_create=current_time,
             gmt_modified=current_time,
@@ -417,13 +419,13 @@ class TestProjectServiceDelete:
         project = await service.create_project(
             project_unique_id="proj-cascade-003",
             directory="my_project_dir",
+            name="Cascade Project 3",
         )
 
         current_time = int(time_module.time())
         workspace = Workspace(
             workspace_unique_id="ws-cascade-003",
             project_unique_id="proj-cascade-003",
-            name="Test Workspace",
             directory="/test/dir",
             gmt_create=current_time,
             gmt_modified=current_time,

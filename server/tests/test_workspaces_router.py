@@ -116,7 +116,6 @@ async def test_workspace(test_session: AsyncSession, test_project: Project):
     workspace = Workspace(
         workspace_unique_id="ws-router-001",
         project_unique_id=test_project.project_unique_id,
-        name="Router Test Workspace",
         branch="feature/test",
         directory="/path/to/workspace",
         gmt_create=1000,
@@ -156,17 +155,15 @@ class TestCreateWorkspace:
             json={
                 "workspace_unique_id": "ws-new-002",
                 "project_unique_id": test_project.project_unique_id,
-                "name": "Development Workspace",
                 "branch": "feature/test",
                 "directory": "/path/to/workspace",
                 "extra": '{"key": "value"}'
             }
         )
-        
+
         assert response.status_code == 201
         data = response.json()
         assert data["workspace_unique_id"] == "ws-new-002"
-        assert data["name"] == "Development Workspace"
         assert data["branch"] == "feature/test"
         assert data["directory"] == "/path/to/workspace"
         assert data["extra"] == '{"key": "value"}'
@@ -215,15 +212,15 @@ class TestListWorkspaces:
             json={
                 "workspace_unique_id": "ws-filter-001",
                 "project_unique_id": test_project2.project_unique_id,
-                "name": "Other Workspace"
+                "directory": "other-workspace"
             }
         )
-        
+
         response = await client.get(
             "/workspaces/",
             params={"project_unique_id": test_project.project_unique_id}
         )
-        
+
         assert response.status_code == 200
         data = response.json()
         assert all(ws["project_unique_id"] == test_project.project_unique_id for ws in data)
@@ -238,10 +235,10 @@ class TestListWorkspaces:
                 json={
                     "workspace_unique_id": f"ws-page-{i:03d}",
                     "project_unique_id": test_project.project_unique_id,
-                    "name": f"Workspace {i}"
+                    "directory": f"workspace{i}"
                 }
             )
-        
+
         response1 = await client.get(
             "/workspaces/",
             params={
@@ -258,7 +255,7 @@ class TestListWorkspaces:
                 "limit": 2
             }
         )
-        
+
         assert response1.status_code == 200
         assert response2.status_code == 200
         assert len(response1.json()) == 2
@@ -272,11 +269,11 @@ class TestGetWorkspace:
         self, client: AsyncClient, test_workspace: Workspace
     ):
         response = await client.get(f"/workspaces/{test_workspace.workspace_unique_id}")
-        
+
         assert response.status_code == 200
         data = response.json()
         assert data["workspace_unique_id"] == test_workspace.workspace_unique_id
-        assert data["name"] == test_workspace.name
+        assert data["directory"] == test_workspace.directory
 
     @pytest.mark.asyncio
     async def test_get_workspace_not_found(self, client: AsyncClient):
@@ -294,14 +291,12 @@ class TestUpdateWorkspace:
         response = await client.put(
             f"/workspaces/{test_workspace.workspace_unique_id}",
             json={
-                "name": "Updated Workspace Name",
                 "branch": "updated-branch"
             }
         )
-        
+
         assert response.status_code == 200
         data = response.json()
-        assert data["name"] == "Updated Workspace Name"
         assert data["branch"] == "updated-branch"
 
     @pytest.mark.asyncio
@@ -318,16 +313,15 @@ class TestUpdateWorkspace:
         self, client: AsyncClient, test_workspace: Workspace
     ):
         original_branch = test_workspace.branch
-        
+
         response = await client.put(
             f"/workspaces/{test_workspace.workspace_unique_id}",
-            json={"name": "Only Name Updated"}
+            json={"branch": "Only Branch Updated"}
         )
-        
+
         assert response.status_code == 200
         data = response.json()
-        assert data["name"] == "Only Name Updated"
-        assert data["branch"] == original_branch
+        assert data["branch"] == "Only Branch Updated"
 
 
 class TestDeleteWorkspace:
@@ -341,15 +335,15 @@ class TestDeleteWorkspace:
             json={
                 "workspace_unique_id": "ws-to-delete",
                 "project_unique_id": test_project.project_unique_id,
-                "name": "Workspace to Delete"
+                "directory": "workspace-to-delete"
             }
         )
         assert create_response.status_code == 201
-        
+
         delete_response = await client.delete("/workspaces/ws-to-delete")
-        
+
         assert delete_response.status_code == 204
-        
+
         get_response = await client.get("/workspaces/ws-to-delete")
         assert get_response.status_code == 404
 

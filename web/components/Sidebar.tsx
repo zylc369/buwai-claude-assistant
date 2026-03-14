@@ -15,6 +15,7 @@ import type { Session } from "@/lib/api/types";
 export function Sidebar() {
   const [isCreateWorkspaceDialogOpen, setIsCreateWorkspaceDialogOpen] = useState(false);
   const [newWorkspaceName, setNewWorkspaceName] = useState("");
+  const [newWorkspaceDirectory, setNewWorkspaceDirectory] = useState("");
   const [newWorkspaceBranch, setNewWorkspaceBranch] = useState("");
 
   const { selectedWorkspace, setSelectedWorkspace } = useWorkspaceStore();
@@ -28,18 +29,18 @@ export function Sidebar() {
   const sessions: Session[] = [];
 
   const handleCreateWorkspace = async () => {
-    if (!newWorkspaceName.trim() || !selectedProject) return;
+    if (!newWorkspaceName.trim() || !newWorkspaceDirectory.trim() || !selectedProject) return;
 
     try {
       await createWorkspace.mutateAsync({
         workspace_unique_id: crypto.randomUUID(),
         project_unique_id: selectedProject.project_unique_id,
-        name: newWorkspaceName.trim(),
         branch: newWorkspaceBranch.trim() || undefined,
-        directory: selectedProject.directory,
+        directory: newWorkspaceDirectory.trim(),
       });
       setIsCreateWorkspaceDialogOpen(false);
       setNewWorkspaceName("");
+      setNewWorkspaceDirectory("");
       setNewWorkspaceBranch("");
     } catch (error) {
       console.error("Failed to create workspace:", error);
@@ -115,7 +116,7 @@ export function Sidebar() {
               <button
                 key={workspace.id}
                 onClick={() => setSelectedWorkspace(workspace)}
-                title={workspace.directory || undefined}
+                title={`projectsRoot/${selectedProject?.directory}/${workspace.directory}/`}
                 className={cn(
                   "w-full flex items-center gap-2 rounded-md px-3 py-2 text-sm text-left",
                   "hover:bg-accent hover:text-accent-foreground",
@@ -124,7 +125,7 @@ export function Sidebar() {
                 )}
               >
                 <FolderOpen className="size-4 shrink-0 text-muted-foreground" />
-                <span className="truncate">{workspace.name || workspace.workspace_unique_id}</span>
+                <span className="truncate">{workspace.directory}</span>
               </button>
             ))
           )}
@@ -211,8 +212,25 @@ export function Sidebar() {
                   </label>
                   <Input
                     value={newWorkspaceName}
-                    onChange={(e) => setNewWorkspaceName(e.target.value)}
-                    placeholder="main"
+                    onChange={(e) => {
+                      const name = e.target.value;
+                      setNewWorkspaceName(name);
+                      const generatedDirectory = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9_-]/g, '');
+                      setNewWorkspaceDirectory(generatedDirectory);
+                    }}
+                    placeholder="My Feature"
+                    className="w-full"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium mb-1.5 block">
+                    Directory Name
+                  </label>
+                  <Input
+                    value={newWorkspaceDirectory}
+                    onChange={(e) => setNewWorkspaceDirectory(e.target.value)}
+                    placeholder="my-feature"
                     className="w-full"
                   />
                 </div>
@@ -239,7 +257,7 @@ export function Sidebar() {
                 </Button>
                 <Button
                   onClick={handleCreateWorkspace}
-                  disabled={!newWorkspaceName.trim() || createWorkspace.isPending}
+                  disabled={!newWorkspaceName.trim() || !newWorkspaceDirectory.trim() || createWorkspace.isPending}
                 >
                   {createWorkspace.isPending ? "Creating..." : "Create"}
                 </Button>

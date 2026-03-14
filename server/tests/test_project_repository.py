@@ -13,8 +13,8 @@ async def create_test_project(
     repo: ProjectRepository,
     project_unique_id: str,
     directory: str,
-    name: str = None,
-    branch: str = None,
+    name: str,
+    branch: str | None = None,
 ) -> Project:
     """Create a test project."""
     current_time = int(time.time())
@@ -23,7 +23,6 @@ async def create_test_project(
         directory=directory,
         name=name,
         branch=branch,
-        time_initialized=current_time,
         gmt_create=current_time,
         gmt_modified=current_time,
     )
@@ -56,18 +55,18 @@ class TestProjectRepositoryCreate:
     async def test_create_project_with_nullable_fields(self, db_session: AsyncSession):
         """Test creating a project with nullable fields as None."""
         repo = ProjectRepository(db_session)
-        
+
         project = await create_test_project(
             repo,
             project_unique_id="proj-002",
             directory="project_dir_2",
-            name=None,
+            name="Project 2",
             branch=None,
         )
         await db_session.commit()
-        
+
         assert project.id is not None
-        assert project.name is None
+        assert project.name == "Project 2"
         assert project.branch is None
 
 
@@ -432,8 +431,7 @@ class TestProjectRepositoryDelete:
         workspace = Workspace(
             workspace_unique_id="ws-001",
             project_unique_id="proj-cascade-001",
-            name="Test Workspace",
-            directory="/test/dir",
+            directory="test-workspace",
             gmt_create=current_time,
             gmt_modified=current_time,
         )
@@ -468,10 +466,9 @@ class TestProjectRepositoryDelete:
         # Create workspace
         current_time = int(time.time())
         workspace = Workspace(
-            workspace_unique_id="ws-002",
+            workspace_unique_id="ws-001",
             project_unique_id="proj-cascade-002",
-            name="Test Workspace",
-            directory="/test/dir",
+            directory="test-workspace",
             gmt_create=current_time,
             gmt_modified=current_time,
         )
@@ -520,10 +517,9 @@ class TestProjectRepositoryDelete:
         # Create workspace
         current_time = int(time.time())
         workspace = Workspace(
-            workspace_unique_id="ws-003",
+            workspace_unique_id="ws-001",
             project_unique_id="proj-cascade-003",
-            name="Test Workspace",
-            directory="/test/dir",
+            directory="test-workspace",
             gmt_create=current_time,
             gmt_modified=current_time,
         )

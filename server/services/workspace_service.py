@@ -1,41 +1,20 @@
 """Workspace service for business logic."""
 
-import re
+import os
 import time
+from pathlib import Path
 from typing import List, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from database.models import Workspace
+from config import get_config
+from database.models import Workspace, DIRECTORY_PATTERN
+from repositories.project_repository import ProjectRepository
 from repositories.workspace_repository import WorkspaceRepository
 from logger import get_logger
 from utils.id_generator import generate_uuidv7
 
 logger = get_logger(__name__)
-
-# Directory name pattern for validation
-DIRECTORY_PATTERN = re.compile(r'^[0-9a-zA-Z_]+$')
-
-
-def _validate_directory(directory: str) -> None:
-    """Validate directory name format.
-
-    Only validates simple directory names (no path separators).
-    Full paths are allowed without validation.
-
-    Args:
-        directory: Directory name to validate.
-
-    Raises:
-        ValueError: If directory name doesn't match the required pattern.
-    """
-    if '/' in directory or '\\' in directory:
-        return
-    if not DIRECTORY_PATTERN.match(directory):
-        raise ValueError(
-            f"Invalid directory name '{directory}'. "
-            "Directory must contain only alphanumeric characters and underscores."
-        )
 
 
 class WorkspaceService:
@@ -57,14 +36,74 @@ class WorkspaceService:
         """
         self.session = session
         self.workspace_repo = WorkspaceRepository(session)
+        self.project_repo = ProjectRepository(session)
+    
+    @staticmethod
+    def _validate_directory(directory: str) -> None:
+        """Validate directory name format.
+
+        Args:
+            directory: Directory name to validate.
+
+        Raises:
+            ValueError: If directory name doesn't match the required pattern.
+        """
+        if not DIRECTORY_PATTERN.match(directory):
+            raise ValueError(
+                f"Invalid directory name '{directory}'. "
+                "Directory must contain only alphanumeric characters, underscores, and hyphens."
+            )
+    
+    def _compute_full_workspace_path(self, project_dir: str, workspace_dir: str) -> Path:
+        """Compute the full path for a workspace directory.
+
+        Args:
+            project_dir: The project directory name.
+            workspace_dir: The workspace directory name.
+
+        Returns:
+            Path object representing the full workspace path.
+        """
+        config = get_config()
+        return Path(config.projects.root) / project_dir / workspace_dir
+    
+    def _create_workspace_directory(self, project_dir: str, workspace_dir: str) -> Path:
+        """Create the physical workspace directory.
+
+        Args:
+            project_dir: The project directory name.
+            workspace_dir: The workspace directory name.
+
+        Returns:
+            Path object representing the created workspace path.
+
+        Raises:
+            ValueError: If the workspace directory already exists.
+            ValueError: If the parent project directory doesn't exist.
+        """
+        workspace_path = self._compute_full_workspace_path(project_dir, workspace_dir)
+        project_path = Path(get_config().projects.root) / project_dir
+        
+        if not project_path.exists():
+            raise ValueError(
+                f"Parent project directory does not exist: {project_path}"
+            )
+        
+        if workspace_path.exists():
+            raise ValueError(
+                f"Workspace directory already exists: {workspace_path}"
+            )
+        
+        workspace_path.mkdir(parents=False, exist_ok=False)
+        logger.debug(f"Created workspace directory: {workspace_path}")
+        return workspace_path
     
     async def create_workspace(
         self,
         workspace_unique_id: str,
         project_unique_id: str,
-        name: Optional[str] = None,
+        directory: str,
         branch: Optional[str] = None,
-        directory: Optional[str] = None,
         extra: Optional[str] = None
     ) -> Workspace:
         """Create a new workspace.
@@ -72,38 +111,55 @@ class WorkspaceService:
         Args:
             workspace_unique_id: Unique identifier for the workspace.
             project_unique_id: Unique identifier of the parent project.
-            name: Optional name for the workspace.
+            directory: Required directory name for the workspace.
             branch: Optional branch name.
-            directory: Optional directory path.
             extra: Optional JSON data as text.
 
         Returns:
             Created workspace instance.
+
+        Raises:
+            ValueError: If parent project not found or directory validation fails.
         """
         logger.debug(f"create_workspace called with workspace_unique_id={workspace_unique_id}, project_unique_id={project_unique_id}")
 
-        if directory:
-            _validate_directory(directory)
+        self._validate_directory(directory)
+
+        project = await self.project_repo.get_by_unique_id(project_unique_id)
+        if not project:
+            raise ValueError(f"Parent project not found: {project_unique_id}")
+
+        workspace_path = None
+        try:
+            workspace_path = self._create_workspace_directory(project.directory, directory)  # type: ignore[arg-type]
+        except ValueError:
+            raise
 
         current_time = int(time.time() * 1000)
         logger.info(f"Business decision: creating workspace {workspace_unique_id}")
-        workspace = await self.workspace_repo.create(
-            workspace_unique_id=workspace_unique_id,
-            project_unique_id=project_unique_id,
-            name=name,
-            branch=branch,
-            directory=directory,
-            extra=extra,
-            gmt_create=current_time,
-            gmt_modified=current_time,
-            latest_active_time=current_time
-        )
+        
+        try:
+            workspace = await self.workspace_repo.create(
+                workspace_unique_id=workspace_unique_id,
+                project_unique_id=project_unique_id,
+                branch=branch,
+                directory=directory,
+                extra=extra,
+                gmt_create=current_time,
+                gmt_modified=current_time,
+                latest_active_time=current_time
+            )
 
-        await self.session.commit()
-        await self.session.refresh(workspace)
+            await self.session.commit()
+            await self.session.refresh(workspace)
 
-        logger.debug(f"create_workspace completed")
-        return workspace
+            logger.debug(f"create_workspace completed")
+            return workspace
+        except Exception as e:
+            if workspace_path and workspace_path.exists():
+                os.rmdir(workspace_path)
+                logger.debug(f"Rolled back directory creation: {workspace_path}")
+            raise
     
     async def get_workspace_by_id(self, workspace_id: int) -> Optional[Workspace]:
         """Get a workspace by its primary key ID.
@@ -170,7 +226,7 @@ class WorkspaceService:
 
         Args:
             workspace_id: Primary key ID of the workspace.
-            **kwargs: Fields to update (name, branch, directory, extra).
+            **kwargs: Fields to update (branch, directory, extra).
 
         Returns:
             Updated workspace if found, None otherwise.
@@ -182,7 +238,7 @@ class WorkspaceService:
             return None
 
         if 'directory' in kwargs and kwargs['directory']:
-            _validate_directory(kwargs['directory'])
+            self._validate_directory(kwargs['directory'])
 
         kwargs['gmt_modified'] = int(time.time() * 1000)
 
