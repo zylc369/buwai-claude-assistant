@@ -11,6 +11,9 @@ from database.models import Message
 from repositories.message_repository import MessageRepository
 from claude_client import ClaudeClient, ClaudeClientConfig
 from pool import ClaudeClientPool
+from logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class MessageService:
@@ -53,6 +56,7 @@ class MessageService:
         Returns:
             Created message instance.
         """
+        logger.debug(f"create_message called with message_unique_id={message_unique_id}, session_unique_id={session_unique_id}")
         current_time = int(time.time())
         
         message = await self.message_repo.create(
@@ -66,6 +70,7 @@ class MessageService:
         await self.session.commit()
         await self.session.refresh(message)
         
+        logger.debug(f"create_message completed")
         return message
     
     async def get_message_by_id(self, message_id: int) -> Optional[Message]:
@@ -77,7 +82,10 @@ class MessageService:
         Returns:
             Message instance if found, None otherwise.
         """
-        return await self.message_repo.get_by_id(message_id)
+        logger.debug(f"get_message_by_id called with message_id={message_id}")
+        result = await self.message_repo.get_by_id(message_id)
+        logger.debug(f"get_message_by_id completed, found={result is not None}")
+        return result
     
     async def get_message_by_unique_id(
         self,
@@ -91,7 +99,10 @@ class MessageService:
         Returns:
             Message instance if found, None otherwise.
         """
-        return await self.message_repo.get_by_unique_id(message_unique_id)
+        logger.debug(f"get_message_by_unique_id called with message_unique_id={message_unique_id}")
+        result = await self.message_repo.get_by_unique_id(message_unique_id)
+        logger.debug(f"get_message_by_unique_id completed, found={result is not None}")
+        return result
     
     async def list_messages(
         self,
@@ -109,11 +120,14 @@ class MessageService:
         Returns:
             List of messages belonging to the session, ordered by creation time.
         """
-        return await self.message_repo.list(
+        logger.debug(f"list_messages called with session_unique_id={session_unique_id}, offset={offset}, limit={limit}")
+        result = await self.message_repo.list(
             session_unique_id=session_unique_id,
             offset=offset,
             limit=limit
         )
+        logger.debug(f"list_messages completed, returned {len(result)} messages")
+        return result
     
     async def list_messages_after_id(
         self,
@@ -131,11 +145,14 @@ class MessageService:
         Returns:
             List of messages with id > last_message_id, ordered by creation time.
         """
-        return await self.message_repo.get_messages_after_id(
+        logger.debug(f"list_messages_after_id called with session_unique_id={session_unique_id}, last_message_id={last_message_id}, limit={limit}")
+        result = await self.message_repo.get_messages_after_id(
             session_unique_id=session_unique_id,
             last_message_id=last_message_id,
             limit=limit
         )
+        logger.debug(f"list_messages_after_id completed, returned {len(result)} messages")
+        return result
     
     def _extract_response_text(self, chunks: List[Any]) -> str:
         """Extract text content from AI response chunks.
@@ -176,26 +193,29 @@ class MessageService:
         pool: Optional[ClaudeClientPool] = None
     ) -> AsyncIterator[Any]:
         """Send a prompt to AI and yield streaming responses.
-        
+
         Integrates with ClaudeClient to send prompts and receive streaming
         AI responses. Uses connection pooling if a pool is provided.
         Persists both user message and AI response to database.
-        
+
         Args:
             prompt: The user prompt to send to AI.
             session_unique_id: Session identifier for conversation continuity.
             client_config: Configuration for ClaudeClient.
             pool: Optional connection pool for client reuse.
-            
+
         Yields:
             Response messages from the AI as an async iterator.
-            
+
         Raises:
             RuntimeError: If client connection fails.
         """
+        logger.debug(f"send_ai_prompt called with session_unique_id={session_unique_id}")
+        logger.info(f"AI operation: sending prompt of length {len(prompt)} characters")
         current_time = int(time.time())
-        
+
         user_msg_id = f"user-{uuid.uuid4()}"
+        logger.info(f"Business decision: creating user message {user_msg_id}")
         await self.message_repo.create(
             message_unique_id=user_msg_id,
             session_unique_id=session_unique_id,
@@ -204,47 +224,59 @@ class MessageService:
             data={"role": "user", "content": prompt}
         )
         await self.session.commit()
-        
+
         ai_chunks = []
-        
-        if pool is not None:
-            client = await pool.get_client(session_unique_id, client_config)
-            try:
-                await client.query(prompt, session_unique_id)
-                async for response in await client.receive_response():
-                    ai_chunks.append(response)
-                    yield response
-            finally:
-                await pool.release_client(session_unique_id)
-        else:
-            async with ClaudeClient(client_config) as client:
-                await client.query(prompt, session_unique_id)
-                async for response in await client.receive_response():
-                    ai_chunks.append(response)
-                    yield response
-        
-        ai_msg_id = f"assistant-{uuid.uuid4()}"
-        ai_response_text = self._extract_response_text(ai_chunks)
-        
-        await self.message_repo.create(
-            message_unique_id=ai_msg_id,
-            session_unique_id=session_unique_id,
-            time_created=current_time,
-            time_updated=current_time,
-            data={"role": "assistant", "content": ai_response_text}
-        )
-        await self.session.commit()
+        logger.info(f"AI operation: querying AI client (using pool={pool is not None})")
+
+        try:
+            if pool is not None:
+                client = await pool.get_client(session_unique_id, client_config)
+                try:
+                    await client.query(prompt, session_unique_id)
+                    async for response in await client.receive_response():
+                        ai_chunks.append(response)
+                        yield response
+                finally:
+                    await pool.release_client(session_unique_id)
+            else:
+                async with ClaudeClient(client_config) as client:
+                    await client.query(prompt, session_unique_id)
+                    async for response in await client.receive_response():
+                        ai_chunks.append(response)
+                        yield response
+
+            ai_msg_id = f"assistant-{uuid.uuid4()}"
+            ai_response_text = self._extract_response_text(ai_chunks)
+            logger.info(f"AI operation: received response of length {len(ai_response_text)} characters")
+
+            logger.info(f"Business decision: creating assistant message {ai_msg_id}")
+            await self.message_repo.create(
+                message_unique_id=ai_msg_id,
+                session_unique_id=session_unique_id,
+                time_created=current_time,
+                time_updated=current_time,
+                data={"role": "assistant", "content": ai_response_text}
+            )
+            await self.session.commit()
+
+            logger.debug(f"send_ai_prompt completed")
+        except Exception as e:
+            logger.error(f"send_ai_prompt failed: {str(e)}")
+            raise
     
     async def count_messages(self, session_unique_id: str) -> int:
         """Count messages for a specific session.
-        
+
         Args:
             session_unique_id: The unique identifier of the session.
-            
+
         Returns:
             Number of messages in the session.
         """
-        return await self.message_repo.count_by_session(session_unique_id)
+        logger.debug(f"count_messages called with session_unique_id={session_unique_id}")
+        result = await self.message_repo.count_by_session(session_unique_id)
+        logger.debug(f"count_messages completed, found {result} messages")
+        return result
     
     async def update_message(
         self,
@@ -253,45 +285,53 @@ class MessageService:
         **kwargs
     ) -> Optional[Message]:
         """Update a message's data.
-        
+
         Args:
             message_unique_id: The unique identifier of the message to update.
             data: New message data dictionary (optional).
             **kwargs: Additional fields to update (e.g., time_updated).
-            
+
         Returns:
             Updated message instance if found, None otherwise.
         """
+        logger.debug(f"update_message called with message_unique_id={message_unique_id}")
         message = await self.message_repo.get_by_unique_id(message_unique_id)
         if not message:
+            logger.debug(f"update_message completed, message not found")
             return None
-        
+
         update_data = kwargs.copy()
         if data is not None:
             update_data["data"] = json.dumps(data)
         if "time_updated" not in update_data:
             update_data["time_updated"] = int(time.time())
-        
+
+        logger.info(f"Business decision: updating message {message_unique_id}")
         updated = await self.message_repo.update(message, **update_data)
         await self.session.commit()
         await self.session.refresh(updated)
-        
+
+        logger.debug(f"update_message completed")
         return updated
     
     async def delete_message(self, message_unique_id: str) -> bool:
         """Delete a message by its unique identifier.
-        
+
         Args:
             message_unique_id: The unique identifier of the message to delete.
-            
+
         Returns:
             True if deleted, False if not found.
         """
+        logger.debug(f"delete_message called with message_unique_id={message_unique_id}")
         message = await self.message_repo.get_by_unique_id(message_unique_id)
         if not message:
+            logger.debug(f"delete_message completed, message not found")
             return False
-        
+
+        logger.info(f"Business decision: deleting message {message_unique_id}")
         await self.message_repo.delete(message)
         await self.session.commit()
-        
+
+        logger.debug(f"delete_message completed")
         return True

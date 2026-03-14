@@ -7,6 +7,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.models import Session
 from repositories.conversation_session_repository import ConversationSessionRepository
+from logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class ConversationSessionService:
@@ -67,8 +70,10 @@ class ConversationSessionService:
         Returns:
             Created Session instance.
         """
+        logger.debug(f"create_session called with session_unique_id={session_unique_id}")
         current_time = int(time.time())
 
+        logger.info(f"Business decision: creating session {session_unique_id} for project {project_unique_id}")
         session = await self.session_repo.create(
             session_unique_id=session_unique_id,
             external_session_id=external_session_id,
@@ -85,6 +90,7 @@ class ConversationSessionService:
         await self.session.commit()
         await self.session.refresh(session)
 
+        logger.debug(f"create_session completed")
         return session
     
     async def get_by_unique_id(self, session_unique_id: str) -> Optional[Session]:
@@ -96,7 +102,10 @@ class ConversationSessionService:
         Returns:
             Session instance if found, None otherwise.
         """
-        return await self.session_repo.get_by_unique_id(session_unique_id)
+        logger.debug(f"get_by_unique_id called with session_unique_id={session_unique_id}")
+        result = await self.session_repo.get_by_unique_id(session_unique_id)
+        logger.debug(f"get_by_unique_id completed, found={result is not None}")
+        return result
 
     async def get_session_by_external_id(
         self, external_session_id: str
@@ -109,9 +118,12 @@ class ConversationSessionService:
         Returns:
             Session instance if found, None otherwise.
         """
-        return await self.session_repo.get_by_external_session_id(
+        logger.debug(f"get_session_by_external_id called with external_session_id={external_session_id}")
+        result = await self.session_repo.get_by_external_session_id(
             external_session_id
         )
+        logger.debug(f"get_session_by_external_id completed, found={result is not None}")
+        return result
 
     async def list_sessions(
         self,
@@ -123,7 +135,7 @@ class ConversationSessionService:
         include_archived: bool = False,
     ) -> List[Session]:
         """List sessions with pagination and optional filters.
-        
+
         Args:
             project_unique_id: Optional filter by project unique ID.
             workspace_unique_id: Optional filter by workspace unique ID.
@@ -131,11 +143,12 @@ class ConversationSessionService:
             offset: Offset for pagination (default: 0).
             limit: Maximum number of results (default: 100).
             include_archived: Whether to include archived sessions (default: False).
-            
+
         Returns:
             List of sessions matching the criteria.
         """
-        return await self.session_repo.list(
+        logger.debug(f"list_sessions called with project_unique_id={project_unique_id}, workspace_unique_id={workspace_unique_id}, offset={offset}, limit={limit}")
+        result = await self.session_repo.list(
             project_unique_id=project_unique_id,
             workspace_unique_id=workspace_unique_id,
             external_session_id=external_session_id,
@@ -143,6 +156,8 @@ class ConversationSessionService:
             limit=limit,
             include_archived=include_archived,
         )
+        logger.debug(f"list_sessions completed, returned {len(result)} sessions")
+        return result
     
     async def update_session(
         self,
@@ -150,45 +165,53 @@ class ConversationSessionService:
         **kwargs
     ) -> Optional[Session]:
         """Update a session's information.
-        
+
         Args:
             session_unique_id: The session's unique identifier.
             **kwargs: Fields to update with new values.
-            
+
         Returns:
             Updated Session instance if found, None otherwise.
         """
+        logger.debug(f"update_session called with session_unique_id={session_unique_id}")
         session = await self.session_repo.get_by_unique_id(session_unique_id)
         if not session:
+            logger.debug(f"update_session completed, session not found")
             return None
-        
+
         # Auto-update time_updated
         kwargs["time_updated"] = int(time.time())
-        
+
+        logger.info(f"Business decision: updating session {session_unique_id}")
         updated = await self.session_repo.update(session, **kwargs)
         await self.session.commit()
         await self.session.refresh(updated)
-        
+
+        logger.debug(f"update_session completed")
         return updated
     
     async def delete_session(self, session_unique_id: str) -> bool:
         """Delete a session by unique ID.
-        
+
         Cascades to related messages as defined in the model relationships.
-        
+
         Args:
             session_unique_id: The session's unique identifier.
-            
+
         Returns:
             True if deleted, False if not found.
         """
+        logger.debug(f"delete_session called with session_unique_id={session_unique_id}")
         session = await self.session_repo.get_by_unique_id(session_unique_id)
         if not session:
+            logger.debug(f"delete_session completed, session not found")
             return False
-        
+
+        logger.info(f"Business decision: deleting session {session_unique_id}")
         await self.session_repo.delete(session)
         await self.session.commit()
-        
+
+        logger.debug(f"delete_session completed")
         return True
     
     async def archive_session(
@@ -197,23 +220,26 @@ class ConversationSessionService:
         archived_time: Optional[int] = None,
     ) -> Optional[Session]:
         """Archive a session by setting its time_archived timestamp.
-        
+
         Args:
             session_unique_id: The unique identifier of the session to archive.
             archived_time: Unix timestamp for archive time (default: current time).
-            
+
         Returns:
             Updated session if found, None otherwise.
         """
+        logger.debug(f"archive_session called with session_unique_id={session_unique_id}")
+        logger.info(f"Business decision: archiving session {session_unique_id}")
         session = await self.session_repo.archive(
             session_unique_id=session_unique_id,
             archived_time=archived_time,
         )
-        
+
         if session:
             await self.session.commit()
             await self.session.refresh(session)
-        
+
+        logger.debug(f"archive_session completed, success={session is not None}")
         return session
     
     async def unarchive_session(
@@ -221,21 +247,24 @@ class ConversationSessionService:
         session_unique_id: str,
     ) -> Optional[Session]:
         """Unarchive a session by clearing its time_archived timestamp.
-        
+
         Args:
             session_unique_id: The unique identifier of the session to unarchive.
-            
+
         Returns:
             Updated session if found, None otherwise.
         """
+        logger.debug(f"unarchive_session called with session_unique_id={session_unique_id}")
+        logger.info(f"Business decision: unarchiving session {session_unique_id}")
         session = await self.session_repo.unarchive(
             session_unique_id=session_unique_id,
         )
-        
+
         if session:
             await self.session.commit()
             await self.session.refresh(session)
-        
+
+        logger.debug(f"unarchive_session completed, success={session is not None}")
         return session
     
     async def count_by_project(
@@ -244,18 +273,21 @@ class ConversationSessionService:
         include_archived: bool = False,
     ) -> int:
         """Count sessions for a specific project.
-        
+
         Args:
             project_unique_id: The unique identifier of the project.
             include_archived: Whether to include archived sessions (default: False).
-            
+
         Returns:
             Number of sessions for the project.
         """
-        return await self.session_repo.count_by_project(
+        logger.debug(f"count_by_project called with project_unique_id={project_unique_id}, include_archived={include_archived}")
+        result = await self.session_repo.count_by_project(
             project_unique_id=project_unique_id,
             include_archived=include_archived,
         )
+        logger.debug(f"count_by_project completed, found {result} sessions")
+        return result
     
     async def count_by_workspace(
         self,
@@ -263,15 +295,18 @@ class ConversationSessionService:
         include_archived: bool = False,
     ) -> int:
         """Count sessions for a specific workspace.
-        
+
         Args:
             workspace_unique_id: The unique identifier of the workspace.
             include_archived: Whether to include archived sessions (default: False).
-            
+
         Returns:
             Number of sessions for the workspace.
         """
-        return await self.session_repo.count_by_workspace(
+        logger.debug(f"count_by_workspace called with workspace_unique_id={workspace_unique_id}, include_archived={include_archived}")
+        result = await self.session_repo.count_by_workspace(
             workspace_unique_id=workspace_unique_id,
             include_archived=include_archived,
         )
+        logger.debug(f"count_by_workspace completed, found {result} sessions")
+        return result

@@ -13,6 +13,9 @@ from dataclasses import dataclass, field
 from typing import Dict, Optional
 
 from claude_client import ClaudeClient, ClaudeClientConfig
+from logger import get_logger
+
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -96,6 +99,7 @@ class ClaudeClientPool:
             ClaudeClient instance ready for use.
         """
         lock = self._get_or_create_lock(session_ulid)
+        logger.debug(f"Acquiring lock for session {session_ulid}")
         
         async with lock:
             if session_ulid in self._pool:
@@ -103,9 +107,11 @@ class ClaudeClientPool:
                 entry = self._pool[session_ulid]
                 entry.last_used = time.time()
                 entry.in_use = True
+                logger.info(f"Reusing existing client for session {session_ulid}")
                 return entry.client
             
             # Create new client
+            logger.info(f"Creating new client for session {session_ulid}")
             client = ClaudeClient(config)
             await client.__aenter__()
             
@@ -135,6 +141,7 @@ class ClaudeClientPool:
             return
         
         lock = self._get_or_create_lock(session_ulid)
+        logger.debug(f"Acquiring lock for session {session_ulid}")
         
         async with lock:
             if session_ulid not in self._pool:
@@ -142,14 +149,16 @@ class ClaudeClientPool:
             
             if disconnect:
                 entry = self._pool.pop(session_ulid)
+                logger.info(f"Disconnecting and removing client for session {session_ulid}")
                 try:
                     await entry.client.__aexit__(None, None, None)
-                except Exception:
-                    pass  # Ignore disconnect errors
+                except Exception as e:
+                    logger.error(f"Error disconnecting client for session {session_ulid}: {e}")
             else:
                 entry = self._pool[session_ulid]
                 entry.last_used = time.time()
                 entry.in_use = False
+                logger.info(f"Released client back to pool for session {session_ulid}")
     
     async def cleanup_idle(self) -> int:
         """Remove clients that have been idle beyond the timeout.
@@ -164,6 +173,7 @@ class ClaudeClientPool:
         now = time.time()
         to_remove = []
         
+        logger.debug("Acquiring pool lock for idle cleanup")
         async with self._pool_lock:
             for session_ulid, entry in list(self._pool.items()):
                 if entry.in_use:
@@ -173,28 +183,35 @@ class ClaudeClientPool:
                 if idle_time > self.idle_timeout_seconds:
                     to_remove.append(session_ulid)
             
+            if to_remove:
+                logger.info(f"Cleaning up {len(to_remove)} idle client(s): {', '.join(to_remove)}")
+            
             for session_ulid in to_remove:
                 entry = self._pool.pop(session_ulid, None)
                 if entry:
                     try:
                         await entry.client.__aexit__(None, None, None)
-                    except Exception:
-                        pass  # Ignore disconnect errors
+                    except Exception as e:
+                        logger.error(f"Error disconnecting idle client for session {session_ulid}: {e}")
         
         return len(to_remove)
     
     async def _cleanup_all(self) -> None:
         """Disconnect and remove all clients from the pool."""
+        logger.debug("Acquiring pool lock for cleanup all")
         async with self._pool_lock:
             session_ulids = list(self._pool.keys())
+            
+            if session_ulids:
+                logger.info(f"Cleaning up all {len(session_ulids)} client(s): {', '.join(session_ulids)}")
             
             for session_ulid in session_ulids:
                 entry = self._pool.pop(session_ulid, None)
                 if entry:
                     try:
                         await entry.client.__aexit__(None, None, None)
-                    except Exception:
-                        pass  # Ignore disconnect errors
+                    except Exception as e:
+                        logger.error(f"Error disconnecting client for session {session_ulid}: {e}")
     
     def pool_size(self) -> int:
         """Get total number of clients in the pool.
@@ -202,7 +219,9 @@ class ClaudeClientPool:
         Returns:
             Total count of clients (both in-use and idle).
         """
-        return len(self._pool)
+        size = len(self._pool)
+        logger.debug(f"Pool size: {size} client(s)")
+        return size
     
     def active_count(self) -> int:
         """Get number of clients currently in use.
@@ -210,4 +229,6 @@ class ClaudeClientPool:
         Returns:
             Count of clients with in_use=True.
         """
-        return sum(1 for entry in self._pool.values() if entry.in_use)
+        count = sum(1 for entry in self._pool.values() if entry.in_use)
+        logger.debug(f"Active client count: {count}")
+        return count

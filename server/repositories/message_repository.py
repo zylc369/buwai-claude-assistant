@@ -8,6 +8,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.models import Message
 from repositories.base import BaseRepository
+from logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class MessageRepository(BaseRepository[Message]):
@@ -27,6 +30,7 @@ class MessageRepository(BaseRepository[Message]):
         """
         super().__init__(session)
         self.model = Message
+        logger.debug("MessageRepository initialized")
     
     async def get_by_session_unique_id(
         self,
@@ -44,14 +48,21 @@ class MessageRepository(BaseRepository[Message]):
         Returns:
             List of messages belonging to the session.
         """
-        result = await self.session.execute(
-            select(Message)
-            .where(Message.session_unique_id == session_unique_id)
-            .order_by(Message.time_created)
-            .offset(offset)
-            .limit(limit)
-        )
-        return list(result.scalars().all())
+        try:
+            logger.debug(f"get_by_session_unique_id called with session_unique_id={session_unique_id}, offset={offset}, limit={limit}")
+            result = await self.session.execute(
+                select(Message)
+                .where(Message.session_unique_id == session_unique_id)
+                .order_by(Message.time_created)
+                .offset(offset)
+                .limit(limit)
+            )
+            messages = list(result.scalars().all())
+            logger.debug(f"get_by_session_unique_id returned {len(messages)} messages")
+            return messages
+        except Exception as e:
+            logger.error(f"get_by_session_unique_id failed: {str(e)}")
+            raise
     
     async def get_by_unique_id(self, message_unique_id: str) -> Optional[Message]:
         """Get a message by its unique identifier.
@@ -62,10 +73,17 @@ class MessageRepository(BaseRepository[Message]):
         Returns:
             Message instance if found, None otherwise.
         """
-        result = await self.session.execute(
-            select(Message).where(Message.message_unique_id == message_unique_id)
-        )
-        return result.scalar_one_or_none()
+        try:
+            logger.debug(f"get_by_unique_id called with message_unique_id={message_unique_id}")
+            result = await self.session.execute(
+                select(Message).where(Message.message_unique_id == message_unique_id)
+            )
+            message = result.scalar_one_or_none()
+            logger.debug(f"get_by_unique_id returned {type(message).__name__ if message else 'None'}")
+            return message
+        except Exception as e:
+            logger.error(f"get_by_unique_id failed: {str(e)}")
+            raise
     
     async def list(
         self,
@@ -85,6 +103,7 @@ class MessageRepository(BaseRepository[Message]):
         Returns:
             List of messages belonging to the session.
         """
+        logger.debug(f"list called with session_unique_id={session_unique_id}, offset={offset}, limit={limit}")
         return await self.get_by_session_unique_id(session_unique_id, offset, limit)
     
     async def create(
@@ -107,16 +126,22 @@ class MessageRepository(BaseRepository[Message]):
         Returns:
             Created message instance.
         """
-        instance = self.model(
-            message_unique_id=message_unique_id,
-            session_unique_id=session_unique_id,
-            time_created=time_created,
-            time_updated=time_updated,
-            data=json.dumps(data) if isinstance(data, dict) else data
-        )
-        self.session.add(instance)
-        await self.session.flush()
-        return instance
+        try:
+            logger.debug(f"create called with message_unique_id={message_unique_id}, session_unique_id={session_unique_id}, time_created={time_created}, time_updated={time_updated}")
+            instance = self.model(
+                message_unique_id=message_unique_id,
+                session_unique_id=session_unique_id,
+                time_created=time_created,
+                time_updated=time_updated,
+                data=json.dumps(data) if isinstance(data, dict) else data
+            )
+            self.session.add(instance)
+            await self.session.flush()
+            logger.debug(f"create returned message with id={instance.id}")
+            return instance
+        except Exception as e:
+            logger.error(f"create failed: {str(e)}")
+            raise
     
     async def get_messages_after_id(
         self,
@@ -134,14 +159,21 @@ class MessageRepository(BaseRepository[Message]):
         Returns:
             List of messages with id > last_message_id, ordered by time_created.
         """
-        result = await self.session.execute(
-            select(Message)
-            .where(Message.session_unique_id == session_unique_id)
-            .where(Message.id > last_message_id)
-            .order_by(Message.time_created)
-            .limit(limit)
-        )
-        return list(result.scalars().all())
+        try:
+            logger.debug(f"get_messages_after_id called with session_unique_id={session_unique_id}, last_message_id={last_message_id}, limit={limit}")
+            result = await self.session.execute(
+                select(Message)
+                .where(Message.session_unique_id == session_unique_id)
+                .where(Message.id > last_message_id)
+                .order_by(Message.time_created)
+                .limit(limit)
+            )
+            messages = list(result.scalars().all())
+            logger.debug(f"get_messages_after_id returned {len(messages)} messages")
+            return messages
+        except Exception as e:
+            logger.error(f"get_messages_after_id failed: {str(e)}")
+            raise
     
     async def count_by_session(self, session_unique_id: str) -> int:
         """Count messages for a specific session.
@@ -152,7 +184,14 @@ class MessageRepository(BaseRepository[Message]):
         Returns:
             Number of messages in the session.
         """
-        result = await self.session.execute(
-            select(Message).where(Message.session_unique_id == session_unique_id)
-        )
-        return len(result.scalars().all())
+        try:
+            logger.debug(f"count_by_session called with session_unique_id={session_unique_id}")
+            result = await self.session.execute(
+                select(Message).where(Message.session_unique_id == session_unique_id)
+            )
+            count = len(result.scalars().all())
+            logger.debug(f"count_by_session returned {count}")
+            return count
+        except Exception as e:
+            logger.error(f"count_by_session failed: {str(e)}")
+            raise

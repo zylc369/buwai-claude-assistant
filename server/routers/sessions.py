@@ -1,15 +1,17 @@
 """Conversation Session API endpoints."""
 
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db_session
 from services import ConversationSessionService
+from logger import get_logger
 
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
+logger = get_logger(__name__)
 
 
 class SessionCreate(BaseModel):
@@ -47,10 +49,14 @@ class SessionResponse(BaseModel):
 
 @router.post("/", response_model=SessionResponse, status_code=201)
 async def create_session(
+    request: Request,
     session_data: SessionCreate,
     db: AsyncSession = Depends(get_db_session)
 ):
     """Create a new conversation session."""
+    logger.info(f"create_session called: {request.method} {request.url.path}")
+    logger.debug(f"params: session_unique_id={session_data.session_unique_id}, project_unique_id={session_data.project_unique_id}")
+
     service = ConversationSessionService(db)
     session = await service.create_session(
         session_unique_id=session_data.session_unique_id,
@@ -60,11 +66,14 @@ async def create_session(
         directory=session_data.directory,
         title=session_data.title,
     )
+
+    logger.info(f"create_session completed: status=201")
     return session
 
 
 @router.get("/", response_model=List[SessionResponse])
 async def list_sessions(
+    request: Request,
     project_unique_id: Optional[str] = None,
     workspace_unique_id: Optional[str] = None,
     external_session_id: Optional[str] = None,
@@ -74,6 +83,9 @@ async def list_sessions(
     db: AsyncSession = Depends(get_db_session)
 ):
     """Get sessions with optional filters (excludes archived by default)."""
+    logger.info(f"list_sessions called: {request.method} {request.url.path}")
+    logger.debug(f"params: project_unique_id={project_unique_id}, workspace_unique_id={workspace_unique_id}, offset={offset}, limit={limit}")
+
     service = ConversationSessionService(db)
     sessions = await service.list_sessions(
         project_unique_id=project_unique_id,
@@ -83,70 +95,107 @@ async def list_sessions(
         limit=limit,
         include_archived=include_archived,
     )
+
+    logger.info(f"list_sessions completed: status=200")
     return sessions
 
 
 @router.get("/{session_unique_id}", response_model=SessionResponse)
 async def get_session(
+    request: Request,
     session_unique_id: str,
     db: AsyncSession = Depends(get_db_session)
 ):
     """Get a specific session by unique ID."""
+    logger.info(f"get_session called: {request.method} {request.url.path}")
+    logger.debug(f"params: session_unique_id={session_unique_id}")
+
     service = ConversationSessionService(db)
     session = await service.get_by_unique_id(session_unique_id)
     if not session:
+        logger.error(f"get_session failed: Session not found")
         raise HTTPException(status_code=404, detail="Session not found")
+
+    logger.info(f"get_session completed: status=200")
     return session
 
 
 @router.put("/{session_unique_id}", response_model=SessionResponse)
 async def update_session(
+    request: Request,
     session_unique_id: str,
     session_data: SessionUpdate,
     db: AsyncSession = Depends(get_db_session)
 ):
     """Update a session."""
+    logger.info(f"update_session called: {request.method} {request.url.path}")
+    logger.debug(f"params: session_unique_id={session_unique_id}")
+
     service = ConversationSessionService(db)
     update_data = {k: v for k, v in session_data.model_dump().items() if v is not None}
     session = await service.update_session(session_unique_id, **update_data)
     if not session:
+        logger.error(f"update_session failed: Session not found")
         raise HTTPException(status_code=404, detail="Session not found")
+
+    logger.info(f"update_session completed: status=200")
     return session
 
 
 @router.delete("/{session_unique_id}", status_code=204)
 async def delete_session(
+    request: Request,
     session_unique_id: str,
     db: AsyncSession = Depends(get_db_session)
 ):
     """Delete a session (cascades to messages)."""
+    logger.info(f"delete_session called: {request.method} {request.url.path}")
+    logger.debug(f"params: session_unique_id={session_unique_id}")
+
     service = ConversationSessionService(db)
     deleted = await service.delete_session(session_unique_id)
     if not deleted:
+        logger.error(f"delete_session failed: Session not found")
         raise HTTPException(status_code=404, detail="Session not found")
+
+    logger.info(f"delete_session completed: status=204")
 
 
 @router.post("/{session_unique_id}/archive", response_model=SessionResponse)
 async def archive_session(
+    request: Request,
     session_unique_id: str,
     db: AsyncSession = Depends(get_db_session)
 ):
     """Archive a session."""
+    logger.info(f"archive_session called: {request.method} {request.url.path}")
+    logger.debug(f"params: session_unique_id={session_unique_id}")
+
     service = ConversationSessionService(db)
     session = await service.archive_session(session_unique_id)
     if not session:
+        logger.error(f"archive_session failed: Session not found")
         raise HTTPException(status_code=404, detail="Session not found")
+
+    logger.info(f"archive_session completed: status=200")
     return session
 
 
 @router.post("/{session_unique_id}/unarchive", response_model=SessionResponse)
 async def unarchive_session(
+    request: Request,
     session_unique_id: str,
     db: AsyncSession = Depends(get_db_session)
 ):
     """Unarchive a session."""
+    logger.info(f"unarchive_session called: {request.method} {request.url.path}")
+    logger.debug(f"params: session_unique_id={session_unique_id}")
+
     service = ConversationSessionService(db)
     session = await service.unarchive_session(session_unique_id)
     if not session:
+        logger.error(f"unarchive_session failed: Session not found")
         raise HTTPException(status_code=404, detail="Session not found")
+
+    logger.info(f"unarchive_session completed: status=200")
     return session

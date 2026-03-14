@@ -6,3 +6,10 @@ server:
 database:
   url: "${DATABASE_URL}"
   echo: false
+
+logging:
+  enabled: true
+  level: "INFO"
+  dir: "app-logs"
+  format: "[时间：%(asctime)s][进程ID:%(process)d][线程ID:%(thread)d][%(class_name)s][%(funcName)s][%(request_id)s] - %(message)s"
+  date_format: "%Y-%m-%d %H-%M-%S"

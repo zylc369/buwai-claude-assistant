@@ -19,12 +19,16 @@ from typing import Any, Optional
 import yaml
 from pydantic import BaseModel, Field, field_validator
 
+from logger import get_logger
+
+logger = get_logger(__name__)
+
 
 # Environment variable pattern for ${VAR:default} interpolation
 ENV_VAR_PATTERN = re.compile(r'\$\{([^}:]+)(?::([^}]*))?\}')
 
 # Known config section prefixes for env var overrides
-CONFIG_SECTIONS = {"SERVER", "DATABASE"}
+CONFIG_SECTIONS = {"SERVER", "DATABASE", "LOGGING"}
 
 
 class CorsConfig(BaseModel):
@@ -84,6 +88,42 @@ class DatabaseConfig(BaseModel):
         return v
 
 
+class LoggingConfig(BaseModel):
+    """日志配置设置。
+    
+    Attributes:
+        enabled: 是否启用日志记录。
+        level: 日志级别 (DEBUG/INFO/WARNING/ERROR/CRITICAL)。
+        dir: 日志文件存储目录。
+        format: 日志格式字符串。
+        date_format: 日志日期格式字符串。
+    """
+    enabled: bool = True
+    level: str = "INFO"
+    dir: str = "app-logs"
+    format: str = "[时间：%(asctime)s][进程ID:%(process)d][线程ID:%(thread)d][%(class_name)s][%(funcName)s][%(request_id)s] - %(message)s"
+    date_format: str = "%Y-%m-%d %H-%M-%S"
+    
+    @field_validator('level')
+    @classmethod
+    def validate_level(cls, v: str) -> str:
+        """验证日志级别是否有效。
+        
+        Args:
+            v: 要验证的日志级别值。
+            
+        Returns:
+            验证后的日志级别（大写形式）。
+            
+        Raises:
+            ValueError: 如果日志级别无效。
+        """
+        valid_levels = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
+        if v.upper() not in valid_levels:
+            raise ValueError(f"Invalid log level: {v}. Must be one of {valid_levels}")
+        return v.upper()
+
+
 class AppConfig(BaseModel):
     """Root application configuration.
     
@@ -93,30 +133,36 @@ class AppConfig(BaseModel):
     Attributes:
         server: Server-related configuration settings.
         database: Database connection configuration.
+        logging: Logging configuration settings.
     """
     server: ServerConfig = Field(default_factory=ServerConfig)
     database: DatabaseConfig = Field(default_factory=DatabaseConfig)
+    logging: LoggingConfig = Field(default_factory=LoggingConfig)
 
 
 def interpolate_env_vars(value: Any) -> Any:
     """Recursively interpolate ${VAR:default} patterns in configuration values.
-    
+
     Supports environment variable substitution with optional default values:
     - ${VAR} - substitutes with env var VAR or empty string if not set
     - ${VAR:default} - substitutes with env var VAR or 'default' if not set
-    
+
     Args:
         value: The value to process (can be str, dict, list, or any other type).
-        
+
     Returns:
         The value with all environment variables interpolated.
     """
+    logger.debug(f"Interpolating environment variables in value: {type(value).__name__}")
     if isinstance(value, str):
         def replace(match: re.Match[str]) -> str:
             var_name = match.group(1)
             default = match.group(2) if match.group(2) is not None else ""
             return os.getenv(var_name, default)
-        return ENV_VAR_PATTERN.sub(replace, value)
+        result = ENV_VAR_PATTERN.sub(replace, value)
+        if result != value:
+            logger.debug(f"Interpolated {value} -> {result}")
+        return result
     elif isinstance(value, dict):
         return {k: interpolate_env_vars(v) for k, v in value.items()}
     elif isinstance(value, list):
@@ -143,21 +189,23 @@ def _set_nested_value(d: dict[str, Any], path: list[str], value: Any) -> None:
 
 def apply_env_overrides(config: dict[str, Any]) -> dict[str, Any]:
     """Apply environment variable overrides using __ separator.
-    
+
     Environment variables with the pattern SECTION__KEY can override
     nested configuration values. For example:
     - SERVER__PORT=9000 sets server.port to 9000
     - DATABASE__URL=postgresql://... sets database.url
     - SERVER__CORS__ORIGINS='["http://example.com"]' sets server.cors.origins
-    
+
     Values are parsed as JSON if possible, otherwise treated as strings.
-    
+
     Args:
         config: The configuration dictionary to modify.
-        
+
     Returns:
         The modified configuration dictionary with overrides applied.
     """
+    logger.debug("Applying environment variable overrides")
+    overrides_count = 0
     for env_key, env_value in os.environ.items():
         for section in CONFIG_SECTIONS:
             if env_key.startswith(f"{section}__"):
@@ -167,7 +215,11 @@ def apply_env_overrides(config: dict[str, Any]) -> dict[str, Any]:
                 except json.JSONDecodeError:
                     parsed_value = env_value
                 _set_nested_value(config, path, parsed_value)
+                logger.debug(f"Applied env override: {env_key}={parsed_value}")
+                overrides_count += 1
                 break
+    if overrides_count > 0:
+        logger.info(f"Applied {overrides_count} environment variable override(s)")
     return config
 
 
@@ -223,31 +275,39 @@ def load_config() -> AppConfig:
         pydantic.ValidationError: If the configuration fails validation.
     """
     config_path = get_config_path()
-    
+    logger.info(f"Loading configuration from {config_path}")
+
     if not config_path.exists():
+        logger.error(f"Config file not found: {config_path}")
         raise FileNotFoundError(f"Config file not found: {config_path}")
-    
+
     # Load YAML
+    logger.debug(f"Loading YAML file: {config_path}")
     with open(config_path, 'r') as f:
         raw_config = yaml.safe_load(f) or {}
-    
+
     # Apply interpolation
+    logger.debug("Applying environment variable interpolation")
     config = interpolate_env_vars(raw_config)
-    
+
     # Apply env overrides
+    logger.debug("Applying environment variable overrides")
     config = apply_env_overrides(config)
-    
+
     # Validate with Pydantic
-    return AppConfig(**config)
+    validated_config = AppConfig(**config)
+    logger.info(f"Configuration loaded successfully from {config_path}")
+    return validated_config
 
 
 def print_config(config: AppConfig, config_path: Path) -> None:
     """Print configuration details for debugging.
-    
+
     Args:
         config: The loaded AppConfig instance.
         config_path: Path to the loaded config file.
     """
+    logger.debug(f"Printing configuration from {config_path}")
     import sys
     print("\n" + "=" * 60, file=sys.stderr)
     print("Configuration Loaded", file=sys.stderr)
@@ -265,22 +325,29 @@ def print_config(config: AppConfig, config_path: Path) -> None:
     print("database:", file=sys.stderr)
     print(f"  url: {config.database.url}", file=sys.stderr)
     print(f"  echo: {config.database.echo}", file=sys.stderr)
+    print("logging:", file=sys.stderr)
+    print(f"  enabled: {config.logging.enabled}", file=sys.stderr)
+    print(f"  level: {config.logging.level}", file=sys.stderr)
+    print(f"  dir: {config.logging.dir}", file=sys.stderr)
+    print(f"  format: {config.logging.format}", file=sys.stderr)
+    print(f"  date_format: {config.logging.date_format}", file=sys.stderr)
     print("=" * 60 + "\n", file=sys.stderr)
 
 
 @lru_cache(maxsize=1)
 def get_config() -> AppConfig:
     """Get cached configuration instance.
-    
+
     Uses LRU cache to ensure configuration is only loaded once per process.
     Subsequent calls return the same cached instance.
-    
+
     Returns:
         Cached AppConfig instance.
     """
     config_path = get_config_path()
     config = load_config()
     print_config(config, config_path)
+    logger.info("Returning cached configuration")
     return config
 
 
@@ -302,6 +369,7 @@ __all__ = [
     "ServerConfig", 
     "DatabaseConfig",
     "CorsConfig",
+    "LoggingConfig",
     "get_config",
     "reset_config_cache",
     "load_config",

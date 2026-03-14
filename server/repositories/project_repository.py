@@ -7,6 +7,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.models import Project
 from repositories.base import BaseRepository
+from logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class ProjectRepository(BaseRepository[Project]):
@@ -25,48 +28,63 @@ class ProjectRepository(BaseRepository[Project]):
     
     def __init__(self, session: AsyncSession):
         """Initialize ProjectRepository with database session.
-        
+
         Args:
             session: SQLAlchemy async session.
         """
         super().__init__(session)
         self.model = Project
+        logger.debug("ProjectRepository initialized")
     
     async def get_by_unique_id(self, project_unique_id: str) -> Optional[Project]:
         """Get a project by its unique identifier.
-        
+
         Args:
             project_unique_id: The unique identifier of the project.
-            
+
         Returns:
             Project instance if found, None otherwise.
         """
-        result = await self.session.execute(
-            select(Project).where(Project.project_unique_id == project_unique_id)
-        )
-        return result.scalar_one_or_none()
+        try:
+            logger.debug(f"get_by_unique_id called with project_unique_id={project_unique_id}")
+            result = await self.session.execute(
+                select(Project).where(Project.project_unique_id == project_unique_id)
+            )
+            project = result.scalar_one_or_none()
+            logger.debug(f"get_by_unique_id returned {type(project).__name__ if project else 'None'}")
+            return project
+        except Exception as e:
+            logger.error(f"get_by_unique_id failed: {str(e)}")
+            raise
     
     async def get_by_name(self, name: str, exact: bool = False) -> List[Project]:
         """Get projects by name.
-        
+
         Args:
             name: The project name to search for.
             exact: If True, do exact match; if False, do fuzzy/partial match.
-            
+
         Returns:
             List of matching projects.
         """
-        if exact:
-            result = await self.session.execute(
-                select(Project).where(Project.name == name)
-            )
-        else:
-            result = await self.session.execute(
-                select(Project).where(
-                    func.lower(Project.name).like(f"%{name.lower()}%")
+        try:
+            logger.debug(f"get_by_name called with name={name}, exact={exact}")
+            if exact:
+                result = await self.session.execute(
+                    select(Project).where(Project.name == name)
                 )
-            )
-        return list(result.scalars().all())
+            else:
+                result = await self.session.execute(
+                    select(Project).where(
+                        func.lower(Project.name).like(f"%{name.lower()}%")
+                    )
+                )
+            projects = list(result.scalars().all())
+            logger.debug(f"get_by_name returned {len(projects)} projects")
+            return projects
+        except Exception as e:
+            logger.error(f"get_by_name failed: {str(e)}")
+            raise
     
     async def list(
         self,
@@ -75,28 +93,35 @@ class ProjectRepository(BaseRepository[Project]):
         name: Optional[str] = None,
     ) -> List[Project]:
         """List projects with pagination and optional name filter.
-        
+
         Args:
             offset: Offset for pagination (default: 0).
             limit: Maximum number of results (default: 100).
             name: Optional name filter (fuzzy match, case-insensitive).
-            
+
         Returns:
             List of projects matching the criteria.
         """
-        query = select(Project)
-        
-        # Apply name filter if provided (fuzzy match)
-        if name:
-            query = query.where(
-                func.lower(Project.name).like(f"%{name.lower()}%")
-            )
-        
-        # Apply pagination
-        query = query.offset(offset).limit(limit)
-        
-        result = await self.session.execute(query)
-        return list(result.scalars().all())
+        try:
+            logger.debug(f"list called with offset={offset}, limit={limit}, name={name}")
+            query = select(Project)
+
+            # Apply name filter if provided (fuzzy match)
+            if name:
+                query = query.where(
+                    func.lower(Project.name).like(f"%{name.lower()}%")
+                )
+
+            # Apply pagination
+            query = query.offset(offset).limit(limit)
+
+            result = await self.session.execute(query)
+            projects = list(result.scalars().all())
+            logger.debug(f"list returned {len(projects)} projects")
+            return projects
+        except Exception as e:
+            logger.error(f"list failed: {str(e)}")
+            raise
     
     # Inherited methods from BaseRepository:
     # - get_by_id(id: int) -> Optional[Project]

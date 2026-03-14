@@ -1,11 +1,14 @@
 """FastAPI application main entry point."""
 
+import uuid
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
 from config import get_config
 from database import init_db
+from logger import setup_logging, shutdown_logging, set_request_id, reset_request_id, get_logger
 from routers.projects import router as projects_router
 from routers.sessions import router as sessions_router
 from routers.workspaces import router as workspaces_router
@@ -15,15 +18,35 @@ try:
 except ImportError:
     events_router = None
 
+_logger = get_logger(__name__)
+
+
+class RequestIDMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
+        request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())[:8]
+        token = set_request_id(request_id)
+        try:
+            _logger.info(f"Request started: {request.method} {request.url.path}")
+            response = await call_next(request)
+            response.headers["X-Request-ID"] = request_id
+            _logger.info(f"Request completed: {request.method} {request.url.path} - {response.status_code}")
+            return response
+        except Exception as e:
+            _logger.error(f"Request failed: {request.method} {request.url.path} - {str(e)}")
+            raise
+        finally:
+            reset_request_id(token)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan events."""
-    # Startup
+    _logger.info("Application starting up")
+    setup_logging(get_config().logging)
     await init_db()
+    _logger.info("Database initialized")
     yield
-    # Shutdown
-    pass
+    _logger.info("Application shutting down")
+    shutdown_logging()
 
 
 # Load configuration
@@ -45,6 +68,8 @@ app.add_middleware(
     allow_methods=config.server.cors.allow_methods,
     allow_headers=config.server.cors.allow_headers,
 )
+
+app.add_middleware(RequestIDMiddleware)
 
 # Include routers
 app.include_router(projects_router)

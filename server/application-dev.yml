@@ -9,3 +9,10 @@ server:
 database:
   url: "sqlite+aiosqlite:///./app.db"
   echo: true
+
+logging:
+  enabled: true
+  level: "DEBUG"
+  dir: "app-logs"
+  format: "[时间：%(asctime)s][进程ID:%(process)d][线程ID:%(thread)d][%(class_name)s][%(funcName)s][%(request_id)s] - %(message)s"
+  date_format: "%Y-%m-%d %H-%M-%S"

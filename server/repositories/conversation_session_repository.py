@@ -8,6 +8,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.models import Session
 from repositories.base import BaseRepository
+from logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class ConversationSessionRepository(BaseRepository[Session]):
@@ -28,6 +31,7 @@ class ConversationSessionRepository(BaseRepository[Session]):
         """
         super().__init__(session)
         self.model = Session
+        logger.debug("ConversationSessionRepository initialized")
     
     async def get_by_unique_id(self, session_unique_id: str) -> Optional[Session]:
         """Get a session by its unique identifier.
@@ -38,10 +42,17 @@ class ConversationSessionRepository(BaseRepository[Session]):
         Returns:
             Session instance if found, None otherwise.
         """
-        result = await self.session.execute(
-            select(Session).where(Session.session_unique_id == session_unique_id)
-        )
-        return result.scalar_one_or_none()
+        try:
+            logger.debug(f"get_by_unique_id called with session_unique_id={session_unique_id}")
+            result = await self.session.execute(
+                select(Session).where(Session.session_unique_id == session_unique_id)
+            )
+            session = result.scalar_one_or_none()
+            logger.debug(f"get_by_unique_id returned {type(session).__name__ if session else 'None'}")
+            return session
+        except Exception as e:
+            logger.error(f"get_by_unique_id failed: {str(e)}")
+            raise
 
     async def get_by_external_session_id(
         self, external_session_id: str
@@ -54,10 +65,17 @@ class ConversationSessionRepository(BaseRepository[Session]):
         Returns:
             Session instance if found, None otherwise.
         """
-        result = await self.session.execute(
-            select(Session).where(Session.external_session_id == external_session_id)
-        )
-        return result.scalar_one_or_none()
+        try:
+            logger.debug(f"get_by_external_session_id called with external_session_id={external_session_id}")
+            result = await self.session.execute(
+                select(Session).where(Session.external_session_id == external_session_id)
+            )
+            session = result.scalar_one_or_none()
+            logger.debug(f"get_by_external_session_id returned {type(session).__name__ if session else 'None'}")
+            return session
+        except Exception as e:
+            logger.error(f"get_by_external_session_id failed: {str(e)}")
+            raise
 
     async def create_session(
         self,
@@ -87,24 +105,31 @@ class ConversationSessionRepository(BaseRepository[Session]):
         Returns:
             Created Session instance.
         """
-        if time_created is None or time_updated is None:
-            current_time = int(time.time())
-            if time_created is None:
-                time_created = current_time
-            if time_updated is None:
-                time_updated = current_time
+        try:
+            logger.debug(f"create_session called with session_unique_id={session_unique_id}, project_unique_id={project_unique_id}, workspace_unique_id={workspace_unique_id}")
+            if time_created is None or time_updated is None:
+                current_time = int(time.time())
+                if time_created is None:
+                    time_created = current_time
+                if time_updated is None:
+                    time_updated = current_time
 
-        return await self.create(
-            session_unique_id=session_unique_id,
-            external_session_id=external_session_id,
-            project_unique_id=project_unique_id,
-            workspace_unique_id=workspace_unique_id,
-            directory=directory,
-            title=title,
-            sdk_session_id=sdk_session_id,
-            time_created=time_created,
-            time_updated=time_updated,
-        )
+            session = await self.create(
+                session_unique_id=session_unique_id,
+                external_session_id=external_session_id,
+                project_unique_id=project_unique_id,
+                workspace_unique_id=workspace_unique_id,
+                directory=directory,
+                title=title,
+                sdk_session_id=sdk_session_id,
+                time_created=time_created,
+                time_updated=time_updated,
+            )
+            logger.debug(f"create_session returned session with id={session.id}")
+            return session
+        except Exception as e:
+            logger.error(f"create_session failed: {str(e)}")
+            raise
 
     async def update_session(
         self,
@@ -124,18 +149,24 @@ class ConversationSessionRepository(BaseRepository[Session]):
         Returns:
             Updated Session instance.
         """
-        update_kwargs = {}
-        if sdk_session_id is not None:
-            update_kwargs["sdk_session_id"] = sdk_session_id
-        if title is not None:
-            update_kwargs["title"] = title
-        if directory is not None:
-            update_kwargs["directory"] = directory
+        try:
+            logger.debug(f"update_session called with session.id={session.id}, sdk_session_id={sdk_session_id}, title={title}, directory={directory}")
+            update_kwargs = {}
+            if sdk_session_id is not None:
+                update_kwargs["sdk_session_id"] = sdk_session_id
+            if title is not None:
+                update_kwargs["title"] = title
+            if directory is not None:
+                update_kwargs["directory"] = directory
 
-        if update_kwargs:
-            session = await self.update(session, **update_kwargs)
+            if update_kwargs:
+                session = await self.update(session, **update_kwargs)
 
-        return session
+            logger.debug(f"update_session returned session with id={session.id}")
+            return session
+        except Exception as e:
+            logger.error(f"update_session failed: {str(e)}")
+            raise
     
     async def get_by_project_unique_id(
         self,
@@ -145,26 +176,33 @@ class ConversationSessionRepository(BaseRepository[Session]):
         include_archived: bool = False,
     ) -> List[Session]:
         """Get all sessions for a specific project.
-        
+
         Args:
             project_unique_id: The unique identifier of the project.
             offset: Offset for pagination (default: 0).
             limit: Maximum number of results (default: 100).
             include_archived: Whether to include archived sessions (default: False).
-            
+
         Returns:
             List of sessions for the project.
         """
-        query = select(Session).where(
-            Session.project_unique_id == project_unique_id
-        )
-        
-        if not include_archived:
-            query = query.where(Session.time_archived.is_(None))
-        
-        query = query.offset(offset).limit(limit)
-        result = await self.session.execute(query)
-        return list(result.scalars().all())
+        try:
+            logger.debug(f"get_by_project_unique_id called with project_unique_id={project_unique_id}, offset={offset}, limit={limit}, include_archived={include_archived}")
+            query = select(Session).where(
+                Session.project_unique_id == project_unique_id
+            )
+
+            if not include_archived:
+                query = query.where(Session.time_archived.is_(None))
+
+            query = query.offset(offset).limit(limit)
+            result = await self.session.execute(query)
+            sessions = list(result.scalars().all())
+            logger.debug(f"get_by_project_unique_id returned {len(sessions)} sessions")
+            return sessions
+        except Exception as e:
+            logger.error(f"get_by_project_unique_id failed: {str(e)}")
+            raise
     
     async def get_by_workspace_unique_id(
         self,
@@ -174,26 +212,33 @@ class ConversationSessionRepository(BaseRepository[Session]):
         include_archived: bool = False,
     ) -> List[Session]:
         """Get all sessions for a specific workspace.
-        
+
         Args:
             workspace_unique_id: The unique identifier of the workspace.
             offset: Offset for pagination (default: 0).
             limit: Maximum number of results (default: 100).
             include_archived: Whether to include archived sessions (default: False).
-            
+
         Returns:
             List of sessions for the workspace.
         """
-        query = select(Session).where(
-            Session.workspace_unique_id == workspace_unique_id
-        )
-        
-        if not include_archived:
-            query = query.where(Session.time_archived.is_(None))
-        
-        query = query.offset(offset).limit(limit)
-        result = await self.session.execute(query)
-        return list(result.scalars().all())
+        try:
+            logger.debug(f"get_by_workspace_unique_id called with workspace_unique_id={workspace_unique_id}, offset={offset}, limit={limit}, include_archived={include_archived}")
+            query = select(Session).where(
+                Session.workspace_unique_id == workspace_unique_id
+            )
+
+            if not include_archived:
+                query = query.where(Session.time_archived.is_(None))
+
+            query = query.offset(offset).limit(limit)
+            result = await self.session.execute(query)
+            sessions = list(result.scalars().all())
+            logger.debug(f"get_by_workspace_unique_id returned {len(sessions)} sessions")
+            return sessions
+        except Exception as e:
+            logger.error(f"get_by_workspace_unique_id failed: {str(e)}")
+            raise
     
     async def list(
         self,
@@ -205,7 +250,7 @@ class ConversationSessionRepository(BaseRepository[Session]):
         include_archived: bool = False,
     ) -> List[Session]:
         """Get sessions with optional filtering and pagination.
-        
+
         Args:
             project_unique_id: Optional filter by project unique ID.
             workspace_unique_id: Optional filter by workspace unique ID.
@@ -213,27 +258,34 @@ class ConversationSessionRepository(BaseRepository[Session]):
             offset: Offset for pagination (default: 0).
             limit: Maximum number of results (default: 100).
             include_archived: Whether to include archived sessions (default: False).
-            
+
         Returns:
             List of sessions matching the filters.
         """
-        query = select(Session)
-        
-        if project_unique_id is not None:
-            query = query.where(Session.project_unique_id == project_unique_id)
-        
-        if workspace_unique_id is not None:
-            query = query.where(Session.workspace_unique_id == workspace_unique_id)
-        
-        if external_session_id is not None:
-            query = query.where(Session.external_session_id == external_session_id)
-        
-        if not include_archived:
-            query = query.where(Session.time_archived.is_(None))
-        
-        query = query.offset(offset).limit(limit)
-        result = await self.session.execute(query)
-        return list(result.scalars().all())
+        try:
+            logger.debug(f"list called with project_unique_id={project_unique_id}, workspace_unique_id={workspace_unique_id}, external_session_id={external_session_id}, offset={offset}, limit={limit}, include_archived={include_archived}")
+            query = select(Session)
+
+            if project_unique_id is not None:
+                query = query.where(Session.project_unique_id == project_unique_id)
+
+            if workspace_unique_id is not None:
+                query = query.where(Session.workspace_unique_id == workspace_unique_id)
+
+            if external_session_id is not None:
+                query = query.where(Session.external_session_id == external_session_id)
+
+            if not include_archived:
+                query = query.where(Session.time_archived.is_(None))
+
+            query = query.offset(offset).limit(limit)
+            result = await self.session.execute(query)
+            sessions = list(result.scalars().all())
+            logger.debug(f"list returned {len(sessions)} sessions")
+            return sessions
+        except Exception as e:
+            logger.error(f"list failed: {str(e)}")
+            raise
     
     async def archive(
         self,
@@ -241,44 +293,58 @@ class ConversationSessionRepository(BaseRepository[Session]):
         archived_time: Optional[int] = None,
     ) -> Optional[Session]:
         """Archive a session by setting its time_archived timestamp.
-        
+
         Args:
             session_unique_id: The unique identifier of the session to archive.
             archived_time: Unix timestamp for archive time (default: current time).
-            
+
         Returns:
             Updated session if found, None otherwise.
         """
-        session = await self.get_by_unique_id(session_unique_id)
-        if session is None:
-            return None
-        
-        if archived_time is None:
-            archived_time = int(time.time())
-        
-        session.time_archived = archived_time
-        await self.session.flush()
-        return session
+        try:
+            logger.debug(f"archive called with session_unique_id={session_unique_id}, archived_time={archived_time}")
+            session = await self.get_by_unique_id(session_unique_id)
+            if session is None:
+                logger.debug(f"archive returned None (session not found)")
+                return None
+
+            if archived_time is None:
+                archived_time = int(time.time())
+
+            session.time_archived = archived_time
+            await self.session.flush()
+            logger.debug(f"archive succeeded for session with id={session.id}")
+            return session
+        except Exception as e:
+            logger.error(f"archive failed: {str(e)}")
+            raise
     
     async def unarchive(
         self,
         session_unique_id: str,
     ) -> Optional[Session]:
         """Unarchive a session by clearing its time_archived timestamp.
-        
+
         Args:
             session_unique_id: The unique identifier of the session to unarchive.
-            
+
         Returns:
             Updated session if found, None otherwise.
         """
-        session = await self.get_by_unique_id(session_unique_id)
-        if session is None:
-            return None
-        
-        session.time_archived = None
-        await self.session.flush()
-        return session
+        try:
+            logger.debug(f"unarchive called with session_unique_id={session_unique_id}")
+            session = await self.get_by_unique_id(session_unique_id)
+            if session is None:
+                logger.debug(f"unarchive returned None (session not found)")
+                return None
+
+            session.time_archived = None
+            await self.session.flush()
+            logger.debug(f"unarchive succeeded for session with id={session.id}")
+            return session
+        except Exception as e:
+            logger.error(f"unarchive failed: {str(e)}")
+            raise
     
     async def count_by_project(
         self,
@@ -286,23 +352,30 @@ class ConversationSessionRepository(BaseRepository[Session]):
         include_archived: bool = False,
     ) -> int:
         """Count sessions for a specific project.
-        
+
         Args:
             project_unique_id: The unique identifier of the project.
             include_archived: Whether to include archived sessions (default: False).
-            
+
         Returns:
             Number of sessions for the project.
         """
-        query = select(Session).where(
-            Session.project_unique_id == project_unique_id
-        )
-        
-        if not include_archived:
-            query = query.where(Session.time_archived.is_(None))
-        
-        result = await self.session.execute(query)
-        return len(result.scalars().all())
+        try:
+            logger.debug(f"count_by_project called with project_unique_id={project_unique_id}, include_archived={include_archived}")
+            query = select(Session).where(
+                Session.project_unique_id == project_unique_id
+            )
+
+            if not include_archived:
+                query = query.where(Session.time_archived.is_(None))
+
+            result = await self.session.execute(query)
+            count = len(result.scalars().all())
+            logger.debug(f"count_by_project returned {count}")
+            return count
+        except Exception as e:
+            logger.error(f"count_by_project failed: {str(e)}")
+            raise
     
     async def count_by_workspace(
         self,
@@ -310,20 +383,27 @@ class ConversationSessionRepository(BaseRepository[Session]):
         include_archived: bool = False,
     ) -> int:
         """Count sessions for a specific workspace.
-        
+
         Args:
             workspace_unique_id: The unique identifier of the workspace.
             include_archived: Whether to include archived sessions (default: False).
-            
+
         Returns:
             Number of sessions for the workspace.
         """
-        query = select(Session).where(
-            Session.workspace_unique_id == workspace_unique_id
-        )
-        
-        if not include_archived:
-            query = query.where(Session.time_archived.is_(None))
-        
-        result = await self.session.execute(query)
-        return len(result.scalars().all())
+        try:
+            logger.debug(f"count_by_workspace called with workspace_unique_id={workspace_unique_id}, include_archived={include_archived}")
+            query = select(Session).where(
+                Session.workspace_unique_id == workspace_unique_id
+            )
+
+            if not include_archived:
+                query = query.where(Session.time_archived.is_(None))
+
+            result = await self.session.execute(query)
+            count = len(result.scalars().all())
+            logger.debug(f"count_by_workspace returned {count}")
+            return count
+        except Exception as e:
+            logger.error(f"count_by_workspace failed: {str(e)}")
+            raise

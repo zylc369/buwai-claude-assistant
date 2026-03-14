@@ -3,6 +3,7 @@
 from typing import AsyncGenerator
 
 from config import get_config
+from logger import get_logger
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -10,11 +11,16 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+logger = get_logger(__name__)
+
 
 def _get_database_url() -> str:
     """Get database URL from configuration."""
     config = get_config()
-    return config.database.url
+    url = config.database.url
+    redacted_url = url.split('//')[-1].split('?')[0] if '//' in url else url
+    logger.info(f"Database URL: {redacted_url}")
+    return url
 
 
 async def _enable_wal_mode() -> None:
@@ -23,12 +29,18 @@ async def _enable_wal_mode() -> None:
         result = await conn.exec_driver_sql("PRAGMA journal_mode")
         mode = result.scalar()
         if mode != "wal":
+            logger.info(f"Enabling WAL mode (current: {mode})")
             await conn.exec_driver_sql("PRAGMA journal_mode=WAL")
+            logger.info("WAL mode enabled successfully")
+        else:
+            logger.debug("WAL mode already enabled")
 
 
 async def init_db() -> None:
     """Initialize database with default configuration."""
+    logger.info("Initializing database...")
     await _enable_wal_mode()
+    logger.info("Database initialized successfully")
 
 # Create async engine with SQLite configuration
 # NO connection pooling for SQLite (handled by WAL mode for concurrency)
@@ -66,9 +78,11 @@ async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
             return await db.execute(select(Item))
     """
     async with SessionLocal() as session:
+        logger.debug("Database session created")
         try:
             yield session
-        except Exception:
+        except Exception as e:
+            logger.error(f"Database session error, rolling back: {e}", exc_info=True)
             await session.rollback()
             raise
         finally:

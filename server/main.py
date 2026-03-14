@@ -4,8 +4,11 @@
 import argparse
 import asyncio
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Union, List, Optional
+
+from logger import get_logger, setup_logging, shutdown_logging
 
 try:
     from claude_client import ClaudeClient
@@ -25,6 +28,17 @@ except ImportError:
     AssistantMessage = None  # type: ignore
     ResultMessage = None  # type: ignore
 
+logger = get_logger(__name__)
+
+
+@dataclass
+class LoggingConfig:
+    enabled: bool = True
+    level: str = "INFO"
+    dir: str = "logs"
+    format: str = "[时间：%(asctime)s][进程ID:%(process)d][线程ID:%(thread)d][%(class_name)s][%(funcName)s][%(request_id)s] - %(message)s"
+    date_format: str = "%Y-%m-%d %H-%M-%S"
+
 
 def process_message(
     message_block: Union["TextBlock", "ToolUseBlock", "AssistantMessage", "ResultMessage", object],
@@ -33,17 +47,20 @@ def process_message(
 ) -> str:
     """
     Process and format message blocks for output.
-    
+
     Args:
         message_block: Message block to process (TextBlock, ToolUseBlock, AssistantMessage, etc.)
         stream: If True, print immediately. If False, return formatted string.
         verbose: If True, show tool use details. If False, hide them.
-    
+
     Returns:
         Formatted string (empty string in stream mode)
     """
+    msg_type = type(message_block).__name__
+    logger.debug(f"Processing message of type: {msg_type}")
+
     result = ""
-    
+
     # Handle AssistantMessage - extract content blocks (only in streaming mode)
     if AssistantMessage and isinstance(message_block, AssistantMessage):
         # In streaming mode, show content as it arrives
@@ -202,18 +219,23 @@ async def repl_loop(cwd: str, settings: str, stream: bool = True, verbose: bool 
                 user_input = input("> ")
             except EOFError:
                 print("\nGoodbye!", file=sys.stderr)
+                logger.info("Exiting due to EOF (Ctrl+D)")
                 break
             except KeyboardInterrupt:
                 print("\nGoodbye!", file=sys.stderr)
+                logger.info("Exiting due to KeyboardInterrupt (Ctrl+C)")
                 break
             # Handle exit commands
             if user_input.strip().lower() in ("exit", "quit"):
                 print("Goodbye!", file=sys.stderr)
+                logger.info("Exiting via exit command")
                 break
             # Skip empty input
             if not user_input.strip():
                 continue
             # Demo mode - just echo back
+            truncated_input = user_input[:50] + "..." if len(user_input) > 50 else user_input
+            logger.debug(f"Demo mode input: {truncated_input}")
             print(f"[Demo mode] You said: {user_input}")
         return
 
@@ -228,18 +250,27 @@ async def repl_loop(cwd: str, settings: str, stream: bool = True, verbose: bool 
         )
         async with ClaudeClient(config) as client:
             while True:
+                logger.debug("REPL loop iteration")
                 try:
                     user_input = input("> ")
                 except EOFError:
                     print("\nGoodbye!", file=sys.stderr)
+                    logger.info("Exiting due to EOF (Ctrl+D)")
+                    break
+                except KeyboardInterrupt:
+                    print("\nGoodbye!", file=sys.stderr)
+                    logger.info("Exiting due to KeyboardInterrupt (Ctrl+C)")
                     break
                 # Handle exit commands
                 if user_input.strip().lower() in ("exit", "quit"):
                     print("Goodbye!", file=sys.stderr)
+                    logger.info("Exiting via exit command")
                     break
                 # Skip empty input
                 if not user_input.strip():
                     continue
+                truncated_input = user_input[:50] + "..." if len(user_input) > 50 else user_input
+                logger.debug(f"User input: {truncated_input}")
                 try:
                     # Send message to Claude
                     await client.query(user_input)
@@ -254,26 +285,38 @@ async def repl_loop(cwd: str, settings: str, stream: bool = True, verbose: bool 
                         result = process_messages(chunks, verbose=verbose)
                         print(result)
                 except Exception as e:
+                    logger.error(f"Error processing message: {e}", exc_info=True)
                     print(f"\nError: {e}", file=sys.stderr)
                     print("Please try again or type 'exit' to quit.", file=sys.stderr)
                     continue
     except KeyboardInterrupt:
         print("\nGoodbye!", file=sys.stderr)
+        logger.info("REPL interrupted by KeyboardInterrupt (Ctrl+C)")
     except Exception as e:
+        logger.error(f"Fatal error in REPL: {e}", exc_info=True)
         print(f"Fatal error: {e}", file=sys.stderr)
 
 
 def main() -> None:
     """Main function to run the Claude SDK REPL."""
     args = parse_args()
-    asyncio.run(
-        repl_loop(
-            cwd=args.cwd,
-            settings=args.settings,
-            stream=args.stream,
-            verbose=args.verbose,
+
+    config = LoggingConfig()
+    setup_logging(config)
+
+    try:
+        logger.info(f"Application started with args: cwd={args.cwd}, settings={args.settings}, stream={args.stream}, verbose={args.verbose}")
+        asyncio.run(
+            repl_loop(
+                cwd=args.cwd,
+                settings=args.settings,
+                stream=args.stream,
+                verbose=args.verbose,
+            )
         )
-    )
+    finally:
+        logger.info("Application shutting down")
+        shutdown_logging()
 
 
 if __name__ == "__main__":

@@ -3,11 +3,14 @@
 import asyncio
 import json
 from typing import AsyncGenerator
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
+
+from logger import get_logger
 
 
 router = APIRouter(prefix="/events", tags=["events"])
+logger = get_logger(__name__)
 
 
 async def event_stream() -> AsyncGenerator[str, None]:
@@ -27,15 +30,17 @@ async def event_stream() -> AsyncGenerator[str, None]:
 
 
 @router.get("/stream")
-async def stream_events():
+async def stream_events(request: Request):
     """SSE endpoint for real-time updates.
-    
+
     Returns:
         StreamingResponse with SSE formatted events.
-        
+
     Example event format:
         data: {"type": "task_update", "task_id": 123, "status": "completed"}
     """
+    logger.info(f"stream_events called: {request.method} {request.url.path}")
+
     return StreamingResponse(
         event_stream(),
         media_type="text/event-stream",
