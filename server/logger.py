@@ -280,7 +280,8 @@ class Logger:
     
     def __init__(self, log_dir: str, log_filename: str = "app", 
                  level: int = logging.INFO, 
-                 format_string: str = "%(asctime)s | %(process)d | %(thread)d | %(class_name)s | %(funcName)s | %(request_id)s | %(message)s"):
+                 format_string: str = "%(asctime)s | %(process)d | %(thread)d | %(class_name)s | %(funcName)s | %(request_id)s | %(message)s",
+                 use_queue: bool = True):
         """Initialize Logger.
         
         Args:
@@ -288,16 +289,20 @@ class Logger:
             log_filename: Base log filename.
             level: Log level (default: INFO).
             format_string: Log format string.
+            use_queue: Use QueueHandler pattern (default: True). Set False for testing.
         """
         self.log_dir = Path(log_dir)
         self.log_filename = log_filename
         self.level = level
         self.format_string = format_string
+        self.use_queue = use_queue
         
         self.log_dir.mkdir(parents=True, exist_ok=True)
         
         self.logger = logging.getLogger(log_filename)
         self.logger.setLevel(level)
+        # Clear any existing handlers to avoid duplicates
+        self.logger.handlers = []
         
         self._queue: queue.Queue = queue.Queue(-1)
         self._handlers: list[logging.Handler] = []
@@ -324,15 +329,19 @@ class Logger:
         ))
         self._handlers.append(file_handler)
         
-        self._listener = logging.handlers.QueueListener(
-            self._queue,
-            *self._handlers,
-            respect_handler_level=True
-        )
-        self._listener.start()
-        
-        queue_handler = logging.handlers.QueueHandler(self._queue)
-        self.logger.addHandler(queue_handler)
+        if self.use_queue:
+            self._listener = logging.handlers.QueueListener(
+                self._queue,
+                *self._handlers,
+                respect_handler_level=True
+            )
+            self._listener.start()
+            
+            queue_handler = logging.handlers.QueueHandler(self._queue)
+            self.logger.addHandler(queue_handler)
+        else:
+            for handler in self._handlers:
+                self.logger.addHandler(handler)
     
     def info(self, message: str) -> None:
         """Log info message."""

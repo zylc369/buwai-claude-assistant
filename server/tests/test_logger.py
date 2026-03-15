@@ -4,6 +4,7 @@
 import asyncio
 import logging
 import tempfile
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Generator
@@ -26,9 +27,10 @@ def mock_config(temp_log_dir: Path) -> dict:
     """Create mock logger configuration."""
     return {
         "log_dir": str(temp_log_dir / "app-logs"),
-        "log_filename": "app",
+        "log_filename": f"test-{uuid.uuid4().hex[:8]}",  # Unique name per test
         "level": logging.INFO,
-        "format_string": "%(asctime)s | %(process)d | %(thread)d | %(class_name)s | %(funcName)s | %(request_id)s | %(message)s"
+        "format_string": "%(asctime)s | %(process)d | %(thread)d | %(class_name)s | %(funcName)s | %(request_id)s | %(message)s",
+        "use_queue": False,  # Disable queue for pytest caplog compatibility
     }
 
 
@@ -320,11 +322,18 @@ class TestLogDirectoryCreation:
 class TestQueueHandlerPattern:
     """Tests for QueueHandler + QueueListener pattern."""
 
-    def test_queue_handler_pattern(self, mock_config: dict):
+    def test_queue_handler_pattern(self, temp_log_dir: Path):
         """Test uses QueueHandler + QueueListener pattern."""
         from logger import Logger
 
-        logger = Logger(**mock_config)
+        config = {
+            "log_dir": str(temp_log_dir / "app-logs"),
+            "log_filename": "app",
+            "level": logging.INFO,
+            "format_string": "%(asctime)s | %(message)s",
+            "use_queue": True,
+        }
+        logger = Logger(**config)
 
         has_queue_handler = any(
             isinstance(h, logging.handlers.QueueHandler)
