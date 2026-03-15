@@ -46,21 +46,16 @@ export function Sidebar() {
   // Auto-select last session when workspace switches (需求 3.3)
   // Clear stale session when switching to workspace with no sessions
   // Clear session when workspace becomes null
-  // Create new session when workspace has no sessions (需求 3.4)
+  // Create new session when workspace has no sessions and no valid session exists (需求 3.4)
   useEffect(() => {
     if (selectedWorkspace) {
-      // If we have a valid persisted session for this workspace, keep it
-      if (selectedSession?.session_unique_id && selectedSession.workspace_unique_id === selectedWorkspace.workspace_unique_id) {
-        return;
-      }
-      
       if (sortedSessions.length > 0 && !isNewSession) {
         if (!selectedSession || selectedSession.workspace_unique_id !== selectedWorkspace.workspace_unique_id) {
           setSelectedSession(sortedSessions[0]);
         }
       } else if (sortedSessions.length === 0 && selectedSession && selectedSession.workspace_unique_id !== selectedWorkspace.workspace_unique_id) {
         clearSession();
-      } else if (sortedSessions.length === 0 && !isNewSession && !selectedSession?.session_unique_id) {
+      } else if (sortedSessions.length === 0 && !isNewSession && (!selectedSession || selectedSession.workspace_unique_id !== selectedWorkspace.workspace_unique_id)) {
         createNewSession(selectedProject!, selectedWorkspace);
       }
     } else if (selectedSession) {
@@ -146,7 +141,7 @@ export function Sidebar() {
                   "w-full flex items-center gap-2 rounded-md px-3 py-2 text-sm text-left",
                   "hover:bg-accent hover:text-accent-foreground",
                   "focus:bg-accent focus:text-accent-foreground outline-none",
-                  selectedWorkspace?.id === workspace.id && "bg-accent/50"
+                  selectedWorkspace?.workspace_unique_id === workspace.workspace_unique_id && "bg-accent text-accent-foreground"
                 )}
               >
                 <FolderOpen className="size-4 shrink-0 text-muted-foreground" />
@@ -233,7 +228,7 @@ export function Sidebar() {
                       "w-full flex items-start gap-2 rounded-md px-3 py-2 text-left",
                       "hover:bg-accent hover:text-accent-foreground",
                       "focus:bg-accent focus:text-accent-foreground outline-none",
-                      selectedSession?.id === session.id && !isNewSession && "bg-accent/50"
+                      selectedSession?.session_unique_id === session.session_unique_id && !isNewSession && "bg-accent text-accent-foreground"
                     )}
                   >
                     <MessageSquare className="size-4 shrink-0 mt-0.5 text-muted-foreground" />
