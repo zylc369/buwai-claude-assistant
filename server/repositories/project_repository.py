@@ -36,19 +36,23 @@ class ProjectRepository(BaseRepository[Project]):
         self.model = Project
         logger.debug("ProjectRepository initialized")
     
-    async def get_by_unique_id(self, project_unique_id: str) -> Optional[Project]:
+    async def get_by_unique_id(self, project_unique_id: str, test: bool = False) -> Optional[Project]:
         """Get a project by its unique identifier.
 
         Args:
             project_unique_id: The unique identifier of the project.
+            test: Filter by test flag (default: False).
 
         Returns:
             Project instance if found, None otherwise.
         """
         try:
-            logger.debug(f"get_by_unique_id called with project_unique_id={project_unique_id}")
+            logger.debug(f"get_by_unique_id called with project_unique_id={project_unique_id}, test={test}")
             result = await self.session.execute(
-                select(Project).where(Project.project_unique_id == project_unique_id)
+                select(Project).where(
+                    Project.project_unique_id == project_unique_id,
+                    Project.test == test
+                )
             )
             project = result.scalar_one_or_none()
             logger.debug(f"get_by_unique_id returned {type(project).__name__ if project else 'None'}")
@@ -57,26 +61,31 @@ class ProjectRepository(BaseRepository[Project]):
             logger.error(f"get_by_unique_id failed: {str(e)}")
             raise
     
-    async def get_by_name(self, name: str, exact: bool = False) -> List[Project]:
+    async def get_by_name(self, name: str, exact: bool = False, test: bool = False) -> List[Project]:
         """Get projects by name.
 
         Args:
             name: The project name to search for.
             exact: If True, do exact match; if False, do fuzzy/partial match.
+            test: Filter by test flag (default: False).
 
         Returns:
             List of matching projects.
         """
         try:
-            logger.debug(f"get_by_name called with name={name}, exact={exact}")
+            logger.debug(f"get_by_name called with name={name}, exact={exact}, test={test}")
             if exact:
                 result = await self.session.execute(
-                    select(Project).where(Project.name == name)
+                    select(Project).where(
+                        Project.name == name,
+                        Project.test == test
+                    )
                 )
             else:
                 result = await self.session.execute(
                     select(Project).where(
-                        func.lower(Project.name).like(f"%{name.lower()}%")
+                        func.lower(Project.name).like(f"%{name.lower()}%"),
+                        Project.test == test
                     )
                 )
             projects = list(result.scalars().all())
@@ -91,6 +100,7 @@ class ProjectRepository(BaseRepository[Project]):
         offset: int = 0,
         limit: int = 100,
         name: Optional[str] = None,
+        test: bool = False,
     ) -> List[Project]:
         """List projects with pagination and optional name filter.
 
@@ -98,13 +108,14 @@ class ProjectRepository(BaseRepository[Project]):
             offset: Offset for pagination (default: 0).
             limit: Maximum number of results (default: 100).
             name: Optional name filter (fuzzy match, case-insensitive).
+            test: Filter by test flag (default: False).
 
         Returns:
             List of projects matching the criteria.
         """
         try:
-            logger.debug(f"list called with offset={offset}, limit={limit}, name={name}")
-            query = select(Project)
+            logger.debug(f"list called with offset={offset}, limit={limit}, name={name}, test={test}")
+            query = select(Project).where(Project.test == test)
 
             # Apply name filter if provided (fuzzy match)
             if name:

@@ -7,8 +7,10 @@ from sqlalchemy import (
     Text,
     ForeignKey,
     Index,
+    Boolean,
 )
 from sqlalchemy.orm import declarative_base, relationship
+from sqlalchemy.sql import text
 
 Base = declarative_base()
 
@@ -17,7 +19,21 @@ Base = declarative_base()
 DIRECTORY_PATTERN = re.compile(r'^[0-9a-zA-Z_-]{1,}$')
 
 
-class Project(Base):
+class TestMixin:
+    """Mixin for test data isolation column.
+    
+    All models inherit from this mixin to support separating test data
+    from production data in the same database.
+    """
+    test = Column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default=text("false")
+    )
+
+
+class Project(Base, TestMixin):
     """Project model for organizing workspaces and sessions."""
 
     __tablename__ = "project"
@@ -35,7 +51,7 @@ class Project(Base):
     sessions = relationship("Session", back_populates="project", cascade="all, delete-orphan")
 
 
-class Workspace(Base):
+class Workspace(Base, TestMixin):
     """Workspace model for project workspaces."""
 
     __tablename__ = "workspace"
@@ -62,7 +78,7 @@ class Workspace(Base):
     )
 
 
-class Session(Base):
+class Session(Base, TestMixin):
     """Session model for conversation sessions."""
 
     __tablename__ = "session"
@@ -98,7 +114,7 @@ class Session(Base):
     )
 
 
-class Message(Base):
+class Message(Base, TestMixin):
     """Message model for conversation messages."""
 
     __tablename__ = "message"

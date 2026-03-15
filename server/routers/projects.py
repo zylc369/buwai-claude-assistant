@@ -49,7 +49,8 @@ class ProjectResponse(BaseModel):
 async def create_project(
     request: Request,
     project_data: ProjectCreate,
-    db: AsyncSession = Depends(get_db_session)
+    db: AsyncSession = Depends(get_db_session),
+    test: bool = Query(False, description="Use test data")
 ):
     """Create a new project.
 
@@ -82,6 +83,7 @@ async def create_project(
             project_unique_id=project_data.project_unique_id,
             name=project_data.name,
             branch=project_data.branch,
+            test=test,
         )
         logger.info(f"create_project completed: status=201")
         return project
@@ -93,6 +95,7 @@ async def create_project(
 @router.get("/", response_model=List[ProjectResponse])
 async def list_projects(
     request: Request,
+    test: bool = Query(False, description="Use test data"),
     offset: int = Query(0, ge=0, description="Offset for pagination"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum number of results"),
     name: Optional[str] = Query(None, description="Filter by name (fuzzy match, case-insensitive)"),
@@ -116,6 +119,7 @@ async def list_projects(
         offset=offset,
         limit=limit,
         name=name,
+        test=test,
     )
 
     logger.info(f"list_projects completed: status=200")
@@ -126,7 +130,8 @@ async def list_projects(
 async def get_project(
     request: Request,
     project_unique_id: str,
-    db: AsyncSession = Depends(get_db_session)
+    db: AsyncSession = Depends(get_db_session),
+    test: bool = Query(False, description="Use test data")
 ):
     """Get a specific project by unique ID.
 
@@ -143,7 +148,7 @@ async def get_project(
     logger.debug(f"params: project_unique_id={project_unique_id}")
 
     service = ProjectService(db)
-    project = await service.get_project_by_unique_id(project_unique_id)
+    project = await service.get_project_by_unique_id(project_unique_id, test=test)
 
     if not project:
         logger.error(f"get_project failed: Project '{project_unique_id}' not found")
@@ -161,7 +166,8 @@ async def update_project(
     request: Request,
     project_unique_id: str,
     project_data: ProjectUpdate,
-    db: AsyncSession = Depends(get_db_session)
+    db: AsyncSession = Depends(get_db_session),
+    test: bool = Query(False, description="Use test data")
 ):
     """Update a project.
 
@@ -180,7 +186,7 @@ async def update_project(
 
     service = ProjectService(db)
 
-    project = await service.get_project_by_unique_id(project_unique_id)
+    project = await service.get_project_by_unique_id(project_unique_id, test=test)
     if not project:
         logger.error(f"update_project failed: Project '{project_unique_id}' not found")
         raise HTTPException(
@@ -194,7 +200,7 @@ async def update_project(
         logger.info(f"update_project completed: status=200 (no changes)")
         return project
 
-    updated = await service.update_project(project.id, **update_data)
+    updated = await service.update_project(project.id, test=test, **update_data)
     logger.info(f"update_project completed: status=200")
     return updated
 
@@ -203,7 +209,8 @@ async def update_project(
 async def delete_project(
     request: Request,
     project_unique_id: str,
-    db: AsyncSession = Depends(get_db_session)
+    db: AsyncSession = Depends(get_db_session),
+    test: bool = Query(False, description="Use test data")
 ):
     """Delete a project (cascades to workspaces, sessions, messages).
 
@@ -218,7 +225,7 @@ async def delete_project(
 
     service = ProjectService(db)
 
-    project = await service.get_project_by_unique_id(project_unique_id)
+    project = await service.get_project_by_unique_id(project_unique_id, test=test)
     if not project:
         logger.error(f"delete_project failed: Project '{project_unique_id}' not found")
         raise HTTPException(
@@ -226,7 +233,7 @@ async def delete_project(
             detail=f"Project '{project_unique_id}' not found"
         )
 
-    deleted = await service.delete_project(project.id)
+    deleted = await service.delete_project(project.id, test=test)
     if not deleted:
         logger.error(f"delete_project failed: Failed to delete project")
         raise HTTPException(

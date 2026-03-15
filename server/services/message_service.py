@@ -44,7 +44,8 @@ class MessageService:
         session_unique_id: str,
         data: Dict[str, Any],
         gmt_create: Optional[int] = None,
-        gmt_modified: Optional[int] = None
+        gmt_modified: Optional[int] = None,
+        test: bool = False
     ) -> Message:
         """Create a new message.
         
@@ -54,11 +55,12 @@ class MessageService:
             data: Message data dictionary (will be stored as JSON).
             gmt_create: Creation timestamp (defaults to current time).
             gmt_modified: Update timestamp (defaults to current time).
+            test: Test flag for the message (default: False).
             
         Returns:
             Created message instance.
         """
-        logger.debug(f"create_message called with message_unique_id={message_unique_id}, session_unique_id={session_unique_id}")
+        logger.debug(f"create_message called with message_unique_id={message_unique_id}, session_unique_id={session_unique_id}, test={test}")
         current_time = get_timestamp_ms()
         
         message = await self.message_repo.create(
@@ -66,7 +68,8 @@ class MessageService:
             session_unique_id=session_unique_id,
             gmt_create=gmt_create or current_time,
             gmt_modified=gmt_modified or current_time,
-            data=data
+            data=data,
+            test=test
         )
         
         await self.session.commit()
@@ -75,34 +78,37 @@ class MessageService:
         logger.debug(f"create_message completed")
         return message
     
-    async def get_message_by_id(self, message_id: int) -> Optional[Message]:
+    async def get_message_by_id(self, message_id: int, test: bool = False) -> Optional[Message]:
         """Get a message by its primary key ID.
         
         Args:
             message_id: The primary key ID of the message.
+            test: Filter by test flag (default: False).
             
         Returns:
             Message instance if found, None otherwise.
         """
-        logger.debug(f"get_message_by_id called with message_id={message_id}")
-        result = await self.message_repo.get_by_id(message_id)
+        logger.debug(f"get_message_by_id called with message_id={message_id}, test={test}")
+        result = await self.message_repo.get_by_id(message_id, test=test)
         logger.debug(f"get_message_by_id completed, found={result is not None}")
         return result
     
     async def get_message_by_unique_id(
         self,
-        message_unique_id: str
+        message_unique_id: str,
+        test: bool = False
     ) -> Optional[Message]:
         """Get a message by its unique identifier.
         
         Args:
             message_unique_id: The unique identifier of the message.
+            test: Filter by test flag (default: False).
             
         Returns:
             Message instance if found, None otherwise.
         """
-        logger.debug(f"get_message_by_unique_id called with message_unique_id={message_unique_id}")
-        result = await self.message_repo.get_by_unique_id(message_unique_id)
+        logger.debug(f"get_message_by_unique_id called with message_unique_id={message_unique_id}, test={test}")
+        result = await self.message_repo.get_by_unique_id(message_unique_id, test=test)
         logger.debug(f"get_message_by_unique_id completed, found={result is not None}")
         return result
     
@@ -110,7 +116,8 @@ class MessageService:
         self,
         session_unique_id: str,
         offset: int = 0,
-        limit: int = 100
+        limit: int = 100,
+        test: bool = False
     ) -> List[Message]:
         """List messages for a session with pagination.
         
@@ -118,15 +125,17 @@ class MessageService:
             session_unique_id: The unique identifier of the session.
             offset: Offset for pagination (default: 0).
             limit: Maximum number of results (default: 100).
+            test: Filter by test flag (default: False).
             
         Returns:
             List of messages belonging to the session, ordered by creation time.
         """
-        logger.debug(f"list_messages called with session_unique_id={session_unique_id}, offset={offset}, limit={limit}")
+        logger.debug(f"list_messages called with session_unique_id={session_unique_id}, offset={offset}, limit={limit}, test={test}")
         result = await self.message_repo.list(
             session_unique_id=session_unique_id,
             offset=offset,
-            limit=limit
+            limit=limit,
+            test=test
         )
         logger.debug(f"list_messages completed, returned {len(result)} messages")
         return result
@@ -135,7 +144,8 @@ class MessageService:
         self,
         session_unique_id: str,
         last_message_id: int,
-        limit: int = 100
+        limit: int = 100,
+        test: bool = False
     ) -> List[Message]:
         """List messages with id greater than last_message_id for incremental fetching.
         
@@ -143,15 +153,17 @@ class MessageService:
             session_unique_id: The unique identifier of the session.
             last_message_id: Only return messages with id > this value.
             limit: Maximum number of results (default: 100).
+            test: Filter by test flag (default: False).
             
         Returns:
             List of messages with id > last_message_id, ordered by creation time.
         """
-        logger.debug(f"list_messages_after_id called with session_unique_id={session_unique_id}, last_message_id={last_message_id}, limit={limit}")
+        logger.debug(f"list_messages_after_id called with session_unique_id={session_unique_id}, last_message_id={last_message_id}, limit={limit}, test={test}")
         result = await self.message_repo.get_messages_after_id(
             session_unique_id=session_unique_id,
             last_message_id=last_message_id,
-            limit=limit
+            limit=limit,
+            test=test
         )
         logger.debug(f"list_messages_after_id completed, returned {len(result)} messages")
         return result
@@ -194,7 +206,8 @@ class MessageService:
         client_config: ClaudeClientConfig,
         project_unique_id: Optional[str] = None,
         workspace_unique_id: Optional[str] = None,
-        pool: Optional[ClaudeClientPool] = None
+        pool: Optional[ClaudeClientPool] = None,
+        test: bool = False
     ) -> AsyncIterator[Any]:
         """Send a prompt to AI and yield streaming responses.
 
@@ -209,6 +222,7 @@ class MessageService:
             project_unique_id: Optional project identifier for activity tracking.
             workspace_unique_id: Optional workspace identifier for activity tracking.
             pool: Optional connection pool for client reuse.
+            test: Test flag for created messages (default: False).
 
         Yields:
             Response messages from the AI as an async iterator.
@@ -216,7 +230,7 @@ class MessageService:
         Raises:
             RuntimeError: If client connection fails.
         """
-        logger.debug(f"send_ai_prompt called with session_unique_id={session_unique_id}")
+        logger.debug(f"send_ai_prompt called with session_unique_id={session_unique_id}, test={test}")
         logger.info(f"AI operation: sending prompt of length {len(prompt)} characters")
         current_time = get_timestamp_ms()
 
@@ -227,7 +241,8 @@ class MessageService:
             session_unique_id=session_unique_id,
             gmt_create=current_time,
             gmt_modified=current_time,
-            data={"role": "user", "content": prompt}
+            data={"role": "user", "content": prompt},
+            test=test
         )
         await self.session.commit()
 
@@ -264,7 +279,8 @@ class MessageService:
                 session_unique_id=session_unique_id,
                 gmt_create=current_time,
                 gmt_modified=current_time,
-                data={"role": "assistant", "content": ai_response_text}
+                data={"role": "assistant", "content": ai_response_text},
+                test=test
             )
             await self.session.commit()
 
@@ -277,7 +293,8 @@ class MessageService:
         self,
         project_unique_id: Optional[str],
         workspace_unique_id: Optional[str],
-        current_time: int
+        current_time: int,
+        test: bool = False
     ) -> None:
         """Update latest_active_time for project and workspace.
 
@@ -285,6 +302,7 @@ class MessageService:
             project_unique_id: Project identifier to update.
             workspace_unique_id: Workspace identifier to update.
             current_time: Current timestamp to set as latest_active_time.
+            test: Test flag (default: False).
         """
         project_repo = ProjectRepository(self.session)
         workspace_repo = WorkspaceRepository(self.session)
@@ -301,17 +319,18 @@ class MessageService:
                 await workspace_repo.update(workspace, latest_active_time=current_time)
                 logger.debug(f"Updated latest_active_time for workspace {workspace_unique_id}")
     
-    async def count_messages(self, session_unique_id: str) -> int:
+    async def count_messages(self, session_unique_id: str, test: bool = False) -> int:
         """Count messages for a specific session.
 
         Args:
             session_unique_id: The unique identifier of the session.
+            test: Filter by test flag (default: False).
 
         Returns:
             Number of messages in the session.
         """
-        logger.debug(f"count_messages called with session_unique_id={session_unique_id}")
-        result = await self.message_repo.count_by_session(session_unique_id)
+        logger.debug(f"count_messages called with session_unique_id={session_unique_id}, test={test}")
+        result = await self.message_repo.count_by_session(session_unique_id, test=test)
         logger.debug(f"count_messages completed, found {result} messages")
         return result
     
@@ -319,6 +338,7 @@ class MessageService:
         self,
         message_unique_id: str,
         data: Optional[Dict[str, Any]] = None,
+        test: bool = False,
         **kwargs
     ) -> Optional[Message]:
         """Update a message's data.
@@ -326,13 +346,14 @@ class MessageService:
         Args:
             message_unique_id: The unique identifier of the message to update.
             data: New message data dictionary (optional).
+            test: Filter by test flag (default: False).
             **kwargs: Additional fields to update (e.g., gmt_modified).
 
         Returns:
             Updated message instance if found, None otherwise.
         """
-        logger.debug(f"update_message called with message_unique_id={message_unique_id}")
-        message = await self.message_repo.get_by_unique_id(message_unique_id)
+        logger.debug(f"update_message called with message_unique_id={message_unique_id}, test={test}")
+        message = await self.message_repo.get_by_unique_id(message_unique_id, test=test)
         if not message:
             logger.debug(f"update_message completed, message not found")
             return None
@@ -351,17 +372,18 @@ class MessageService:
         logger.debug(f"update_message completed")
         return updated
     
-    async def delete_message(self, message_unique_id: str) -> bool:
+    async def delete_message(self, message_unique_id: str, test: bool = False) -> bool:
         """Delete a message by its unique identifier.
 
         Args:
             message_unique_id: The unique identifier of the message to delete.
+            test: Filter by test flag (default: False).
 
         Returns:
             True if deleted, False if not found.
         """
-        logger.debug(f"delete_message called with message_unique_id={message_unique_id}")
-        message = await self.message_repo.get_by_unique_id(message_unique_id)
+        logger.debug(f"delete_message called with message_unique_id={message_unique_id}, test={test}")
+        message = await self.message_repo.get_by_unique_id(message_unique_id, test=test)
         if not message:
             logger.debug(f"delete_message completed, message not found")
             return False

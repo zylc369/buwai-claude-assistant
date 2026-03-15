@@ -104,7 +104,8 @@ class WorkspaceService:
         project_unique_id: str,
         directory: str,
         branch: Optional[str] = None,
-        extra: Optional[str] = None
+        extra: Optional[str] = None,
+        test: bool = False
     ) -> Workspace:
         """Create a new workspace.
 
@@ -114,6 +115,7 @@ class WorkspaceService:
             directory: Required directory name for the workspace.
             branch: Optional branch name.
             extra: Optional JSON data as text.
+            test: Whether this is a test workspace (default: False).
 
         Returns:
             Created workspace instance.
@@ -125,7 +127,7 @@ class WorkspaceService:
 
         self._validate_directory(directory)
 
-        project = await self.project_repo.get_by_unique_id(project_unique_id)
+        project = await self.project_repo.get_by_unique_id(project_unique_id, test=test)
         if not project:
             raise ValueError(f"Parent project not found: {project_unique_id}")
 
@@ -145,6 +147,7 @@ class WorkspaceService:
                 branch=branch,
                 directory=directory,
                 extra=extra,
+                test=test,
                 gmt_create=current_time,
                 gmt_modified=current_time,
                 latest_active_time=current_time
@@ -161,34 +164,37 @@ class WorkspaceService:
                 logger.debug(f"Rolled back directory creation: {workspace_path}")
             raise
     
-    async def get_workspace_by_id(self, workspace_id: int) -> Optional[Workspace]:
+    async def get_workspace_by_id(self, workspace_id: int, test: bool = False) -> Optional[Workspace]:
         """Get a workspace by its primary key ID.
 
         Args:
             workspace_id: Primary key ID of the workspace.
+            test: Whether to query test workspaces (default: False).
 
         Returns:
             Workspace if found, None otherwise.
         """
         logger.debug(f"get_workspace_by_id called with workspace_id={workspace_id}")
-        result = await self.workspace_repo.get_by_id(workspace_id)
+        result = await self.workspace_repo.get_by_id(workspace_id, test=test)
         logger.debug(f"get_workspace_by_id completed, found={result is not None}")
         return result
     
     async def get_workspace_by_unique_id(
         self,
-        workspace_unique_id: str
+        workspace_unique_id: str,
+        test: bool = False
     ) -> Optional[Workspace]:
         """Get a workspace by its unique identifier.
 
         Args:
             workspace_unique_id: Unique identifier of the workspace.
+            test: Whether to query test workspaces (default: False).
 
         Returns:
             Workspace if found, None otherwise.
         """
         logger.debug(f"get_workspace_by_unique_id called with workspace_unique_id={workspace_unique_id}")
-        result = await self.workspace_repo.get_by_unique_id(workspace_unique_id)
+        result = await self.workspace_repo.get_by_unique_id(workspace_unique_id, test=test)
         logger.debug(f"get_workspace_by_unique_id completed, found={result is not None}")
         return result
     
@@ -196,7 +202,8 @@ class WorkspaceService:
         self,
         project_unique_id: str,
         offset: int = 0,
-        limit: int = 100
+        limit: int = 100,
+        test: bool = False
     ) -> List[Workspace]:
         """Get paginated list of workspaces for a project.
 
@@ -204,6 +211,7 @@ class WorkspaceService:
             project_unique_id: Unique identifier of the project (required).
             offset: Offset for pagination (default: 0).
             limit: Maximum number of results (default: 100).
+            test: Whether to query test workspaces (default: False).
 
         Returns:
             List of workspaces for the project.
@@ -212,7 +220,8 @@ class WorkspaceService:
         result = await self.workspace_repo.list(
             project_unique_id=project_unique_id,
             offset=offset,
-            limit=limit
+            limit=limit,
+            test=test
         )
         logger.debug(f"list_workspaces completed, returned {len(result)} workspaces")
         return result
@@ -220,19 +229,21 @@ class WorkspaceService:
     async def update_workspace(
         self,
         workspace_id: int,
+        test: bool = False,
         **kwargs
     ) -> Optional[Workspace]:
         """Update workspace information.
 
         Args:
             workspace_id: Primary key ID of the workspace.
+            test: Whether to query test workspaces (default: False).
             **kwargs: Fields to update (branch, directory, extra).
 
         Returns:
             Updated workspace if found, None otherwise.
         """
         logger.debug(f"update_workspace called with workspace_id={workspace_id}")
-        workspace = await self.workspace_repo.get_by_id(workspace_id)
+        workspace = await self.workspace_repo.get_by_id(workspace_id, test=test)
         if not workspace:
             logger.debug(f"update_workspace completed, workspace not found")
             return None
@@ -252,18 +263,20 @@ class WorkspaceService:
 
     async def update_latest_active_time(
         self,
-        workspace_id: int
+        workspace_id: int,
+        test: bool = False
     ) -> Optional[Workspace]:
         """Update the latest active time for a workspace.
 
         Args:
             workspace_id: Primary key ID of the workspace.
+            test: Whether to query test workspaces (default: False).
 
         Returns:
             Updated workspace if found, None otherwise.
         """
         logger.debug(f"update_latest_active_time called with workspace_id={workspace_id}")
-        workspace = await self.workspace_repo.get_by_id(workspace_id)
+        workspace = await self.workspace_repo.get_by_id(workspace_id, test=test)
         if not workspace:
             logger.debug(f"update_latest_active_time completed, workspace not found")
             return None
@@ -280,7 +293,7 @@ class WorkspaceService:
         logger.debug(f"update_latest_active_time completed")
         return updated
     
-    async def delete_workspace(self, workspace_id: int) -> bool:
+    async def delete_workspace(self, workspace_id: int, test: bool = False) -> bool:
         """Delete a workspace.
 
         Note: This will cascade delete all associated sessions due to
@@ -288,12 +301,13 @@ class WorkspaceService:
 
         Args:
             workspace_id: Primary key ID of the workspace.
+            test: Whether to query test workspaces (default: False).
 
         Returns:
             True if deleted, False if workspace not found.
         """
         logger.debug(f"delete_workspace called with workspace_id={workspace_id}")
-        workspace = await self.workspace_repo.get_by_id(workspace_id)
+        workspace = await self.workspace_repo.get_by_id(workspace_id, test=test)
         if not workspace:
             logger.debug(f"delete_workspace completed, workspace not found")
             return False
@@ -308,13 +322,15 @@ class WorkspaceService:
     async def search_workspaces(
         self,
         name_query: str,
-        project_unique_id: Optional[str] = None
+        project_unique_id: Optional[str] = None,
+        test: bool = False
     ) -> List[Workspace]:
         """Search workspaces by name (case-insensitive partial match).
 
         Args:
             name_query: Search string to match against workspace names.
             project_unique_id: Optional project ID to filter results.
+            test: Whether to query test workspaces (default: False).
 
         Returns:
             List of matching workspaces.
@@ -322,7 +338,8 @@ class WorkspaceService:
         logger.debug(f"search_workspaces called with name_query={name_query}, project_unique_id={project_unique_id}")
         result = await self.workspace_repo.get_by_name(
             name_query=name_query,
-            project_unique_id=project_unique_id
+            project_unique_id=project_unique_id,
+            test=test
         )
         logger.debug(f"search_workspaces completed, found {len(result)} workspaces")
         return result

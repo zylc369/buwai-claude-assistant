@@ -1,7 +1,9 @@
 """Tests for Workspace API endpoints."""
 
+import os
 import pytest
 import pytest_asyncio
+from pathlib import Path
 from typing import AsyncGenerator
 from httpx import AsyncClient, ASGITransport
 from fastapi import FastAPI
@@ -9,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sess
 
 from database.models import Base, Project, Workspace
 from database import get_db_session
+from config import get_config
 
 import sys
 import importlib.util
@@ -79,15 +82,24 @@ async def client(app):
         yield ac
 
 
+def _ensure_project_directory_exists(directory_name: str) -> None:
+    config = get_config()
+    project_path = Path(config.projects.root) / directory_name
+    project_path.mkdir(parents=True, exist_ok=True)
+
+
 @pytest_asyncio.fixture
 async def test_project(test_session: AsyncSession):
+    _ensure_project_directory_exists("worktree")
+    
     project = Project(
         project_unique_id="proj-router-001",
         directory="worktree",
         branch="main",
         name="Router Test Project",
         gmt_create=1000000,
-        gmt_modified=1000000
+        gmt_modified=1000000,
+        test=True
     )
     test_session.add(project)
     await test_session.commit()
@@ -97,13 +109,16 @@ async def test_project(test_session: AsyncSession):
 
 @pytest_asyncio.fixture
 async def test_project2(test_session: AsyncSession):
+    _ensure_project_directory_exists("worktree2")
+    
     project = Project(
         project_unique_id="proj-router-002",
         directory="worktree2",
         branch="develop",
         name="Router Test Project 2",
         gmt_create=1000000,
-        gmt_modified=1000000
+        gmt_modified=1000000,
+        test=True
     )
     test_session.add(project)
     await test_session.commit()
@@ -120,6 +135,7 @@ async def test_workspace(test_session: AsyncSession, test_project: Project):
         directory="workspace",
         gmt_create=1000,
         gmt_modified=1000,
+        test=True
     )
     test_session.add(workspace)
     await test_session.commit()
@@ -134,10 +150,11 @@ class TestCreateWorkspace:
         self, client: AsyncClient, test_project: Project
     ):
         response = await client.post(
-            "/workspaces/",
+            "/workspaces/?test=true",
             json={
                 "workspace_unique_id": "ws-new-001",
-                "project_unique_id": test_project.project_unique_id
+                "project_unique_id": test_project.project_unique_id,
+                "directory": "test-workspace"
             }
         )
         
@@ -151,12 +168,12 @@ class TestCreateWorkspace:
         self, client: AsyncClient, test_project: Project
     ):
         response = await client.post(
-            "/workspaces/",
+            "/workspaces/?test=true",
             json={
                 "workspace_unique_id": "ws-new-002",
                 "project_unique_id": test_project.project_unique_id,
                 "branch": "feature/test",
-                "directory": "/path/to/workspace",
+                "directory": "path_to_workspace",
                 "extra": '{"key": "value"}'
             }
         )
@@ -165,7 +182,7 @@ class TestCreateWorkspace:
         data = response.json()
         assert data["workspace_unique_id"] == "ws-new-002"
         assert data["branch"] == "feature/test"
-        assert data["directory"] == "/path/to/workspace"
+        assert data["directory"] == "path_to_workspace"
         assert data["extra"] == '{"key": "value"}'
 
 
@@ -177,7 +194,7 @@ class TestListWorkspaces:
     ):
         response = await client.get(
             "/workspaces/",
-            params={"project_unique_id": test_project.project_unique_id}
+            params={"project_unique_id": test_project.project_unique_id, "test": True}
         )
         
         assert response.status_code == 200
@@ -191,7 +208,7 @@ class TestListWorkspaces:
     ):
         response = await client.get(
             "/workspaces/",
-            params={"project_unique_id": test_project2.project_unique_id}
+            params={"project_unique_id": test_project2.project_unique_id, "test": True}
         )
         
         assert response.status_code == 200
@@ -208,7 +225,7 @@ class TestListWorkspaces:
         test_workspace: Workspace
     ):
         await client.post(
-            "/workspaces/",
+            "/workspaces/?test=true",
             json={
                 "workspace_unique_id": "ws-filter-001",
                 "project_unique_id": test_project2.project_unique_id,
@@ -218,7 +235,7 @@ class TestListWorkspaces:
 
         response = await client.get(
             "/workspaces/",
-            params={"project_unique_id": test_project.project_unique_id}
+            params={"project_unique_id": test_project.project_unique_id, "test": True}
         )
 
         assert response.status_code == 200
@@ -231,7 +248,7 @@ class TestListWorkspaces:
     ):
         for i in range(5):
             await client.post(
-                "/workspaces/",
+                "/workspaces/?test=true",
                 json={
                     "workspace_unique_id": f"ws-page-{i:03d}",
                     "project_unique_id": test_project.project_unique_id,
@@ -244,7 +261,8 @@ class TestListWorkspaces:
             params={
                 "project_unique_id": test_project.project_unique_id,
                 "offset": 0,
-                "limit": 2
+                "limit": 2,
+                "test": True
             }
         )
         response2 = await client.get(
@@ -252,7 +270,8 @@ class TestListWorkspaces:
             params={
                 "project_unique_id": test_project.project_unique_id,
                 "offset": 2,
-                "limit": 2
+                "limit": 2,
+                "test": True
             }
         )
 
@@ -268,7 +287,7 @@ class TestGetWorkspace:
     async def test_get_workspace_by_unique_id(
         self, client: AsyncClient, test_workspace: Workspace
     ):
-        response = await client.get(f"/workspaces/{test_workspace.workspace_unique_id}")
+        response = await client.get(f"/workspaces/{test_workspace.workspace_unique_id}?test=true")
 
         assert response.status_code == 200
         data = response.json()
@@ -277,7 +296,7 @@ class TestGetWorkspace:
 
     @pytest.mark.asyncio
     async def test_get_workspace_not_found(self, client: AsyncClient):
-        response = await client.get("/workspaces/non-existent-ws")
+        response = await client.get("/workspaces/non-existent-ws?test=true")
         
         assert response.status_code == 404
 
@@ -289,7 +308,7 @@ class TestUpdateWorkspace:
         self, client: AsyncClient, test_workspace: Workspace
     ):
         response = await client.put(
-            f"/workspaces/{test_workspace.workspace_unique_id}",
+            f"/workspaces/{test_workspace.workspace_unique_id}?test=true",
             json={
                 "branch": "updated-branch"
             }
@@ -302,7 +321,7 @@ class TestUpdateWorkspace:
     @pytest.mark.asyncio
     async def test_update_workspace_not_found(self, client: AsyncClient):
         response = await client.put(
-            "/workspaces/non-existent-ws",
+            "/workspaces/non-existent-ws?test=true",
             json={"name": "New Name"}
         )
         
@@ -315,7 +334,7 @@ class TestUpdateWorkspace:
         original_branch = test_workspace.branch
 
         response = await client.put(
-            f"/workspaces/{test_workspace.workspace_unique_id}",
+            f"/workspaces/{test_workspace.workspace_unique_id}?test=true",
             json={"branch": "Only Branch Updated"}
         )
 
@@ -331,7 +350,7 @@ class TestDeleteWorkspace:
         self, client: AsyncClient, test_project: Project
     ):
         create_response = await client.post(
-            "/workspaces/",
+            "/workspaces/?test=true",
             json={
                 "workspace_unique_id": "ws-to-delete",
                 "project_unique_id": test_project.project_unique_id,
@@ -340,15 +359,15 @@ class TestDeleteWorkspace:
         )
         assert create_response.status_code == 201
 
-        delete_response = await client.delete("/workspaces/ws-to-delete")
+        delete_response = await client.delete("/workspaces/ws-to-delete?test=true")
 
         assert delete_response.status_code == 204
 
-        get_response = await client.get("/workspaces/ws-to-delete")
+        get_response = await client.get("/workspaces/ws-to-delete?test=true")
         assert get_response.status_code == 404
 
     @pytest.mark.asyncio
     async def test_delete_workspace_not_found(self, client: AsyncClient):
-        response = await client.delete("/workspaces/non-existent-ws")
+        response = await client.delete("/workspaces/non-existent-ws?test=true")
         
         assert response.status_code == 404

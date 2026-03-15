@@ -23,7 +23,8 @@ async def create_test_project_and_workspace(
         name=f"Project {project_unique_id}",
         gmt_create=current_time,
         gmt_modified=current_time,
-    )
+            test=True,
+        )
     db_session.add(project)
     await db_session.flush()
     
@@ -33,7 +34,8 @@ async def create_test_project_and_workspace(
         directory="test-dir",
         gmt_create=current_time,
         gmt_modified=current_time,
-    )
+            test=True,
+        )
     db_session.add(workspace)
     await db_session.flush()
     
@@ -62,6 +64,7 @@ async def create_test_session(
         gmt_create=current_time,
         gmt_modified=current_time,
         time_archived=time_archived,
+        test=True,
     )
 
 
@@ -139,7 +142,7 @@ class TestConversationSessionRepositoryGetById:
         )
         await db_session.commit()
         
-        result = await repo.get_by_id(session.id)
+        result = await repo.get_by_id(session.id, test=True)
         
         assert result is not None
         assert result.id == session.id
@@ -151,7 +154,7 @@ class TestConversationSessionRepositoryGetById:
         """Test getting a non-existent session by ID."""
         repo = ConversationSessionRepository(db_session)
         
-        result = await repo.get_by_id(99999)
+        result = await repo.get_by_id(99999, test=True)
         
         assert result is None
 
@@ -178,7 +181,7 @@ class TestConversationSessionRepositoryGetByUniqueId:
         )
         await db_session.commit()
         
-        result = await repo.get_by_unique_id("unique-sess-001")
+        result = await repo.get_by_unique_id("unique-sess-001", test=True)
         
         assert result is not None
         assert result.session_unique_id == "unique-sess-001"
@@ -189,7 +192,7 @@ class TestConversationSessionRepositoryGetByUniqueId:
         """Test getting a non-existent session by unique ID."""
         repo = ConversationSessionRepository(db_session)
         
-        result = await repo.get_by_unique_id("non-existent-unique-id")
+        result = await repo.get_by_unique_id("non-existent-unique-id", test=True)
         
         assert result is None
 
@@ -217,7 +220,7 @@ class TestConversationSessionRepositoryGetByProjectUniqueId:
             )
         await db_session.commit()
         
-        results = await repo.get_by_project_unique_id("proj-005")
+        results = await repo.get_by_project_unique_id("proj-005", test=True)
         
         assert len(results) == 3
         for session in results:
@@ -244,15 +247,15 @@ class TestConversationSessionRepositoryGetByProjectUniqueId:
         await db_session.commit()
         
         # Get first page
-        page1 = await repo.get_by_project_unique_id("proj-006", offset=0, limit=3)
+        page1 = await repo.get_by_project_unique_id("proj-006", offset=0, limit=3, test=True)
         assert len(page1) == 3
         
         # Get second page
-        page2 = await repo.get_by_project_unique_id("proj-006", offset=3, limit=3)
+        page2 = await repo.get_by_project_unique_id("proj-006", offset=3, limit=3, test=True)
         assert len(page2) == 3
         
         # Get last page
-        last_page = await repo.get_by_project_unique_id("proj-006", offset=9, limit=3)
+        last_page = await repo.get_by_project_unique_id("proj-006", offset=9, limit=3, test=True)
         assert len(last_page) == 1
 
     @pytest.mark.asyncio
@@ -288,13 +291,13 @@ class TestConversationSessionRepositoryGetByProjectUniqueId:
         
         # Get only active sessions (default)
         active_only = await repo.get_by_project_unique_id(
-            "proj-007", include_archived=False
+            "proj-007", include_archived=False, test=True
         )
         assert len(active_only) == 3
         
         # Get all sessions including archived
         all_sessions = await repo.get_by_project_unique_id(
-            "proj-007", include_archived=True
+            "proj-007", include_archived=True, test=True
         )
         assert len(all_sessions) == 5
 
@@ -308,7 +311,7 @@ class TestConversationSessionRepositoryGetByProjectUniqueId:
         )
         repo = ConversationSessionRepository(db_session)
         
-        results = await repo.get_by_project_unique_id("proj-empty")
+        results = await repo.get_by_project_unique_id("proj-empty", test=True)
         
         assert len(results) == 0
 
@@ -336,7 +339,7 @@ class TestConversationSessionRepositoryGetByWorkspaceUniqueId:
             )
         await db_session.commit()
         
-        results = await repo.get_by_workspace_unique_id("ws-008")
+        results = await repo.get_by_workspace_unique_id("ws-008", test=True)
         
         assert len(results) == 3
         for session in results:
@@ -363,11 +366,11 @@ class TestConversationSessionRepositoryGetByWorkspaceUniqueId:
         await db_session.commit()
         
         # Get first page
-        page1 = await repo.get_by_workspace_unique_id("ws-009", offset=0, limit=3)
+        page1 = await repo.get_by_workspace_unique_id("ws-009", offset=0, limit=3, test=True)
         assert len(page1) == 3
         
         # Get second page
-        page2 = await repo.get_by_workspace_unique_id("ws-009", offset=3, limit=3)
+        page2 = await repo.get_by_workspace_unique_id("ws-009", offset=3, limit=3, test=True)
         assert len(page2) == 3
 
     @pytest.mark.asyncio
@@ -403,13 +406,13 @@ class TestConversationSessionRepositoryGetByWorkspaceUniqueId:
         
         # Get only active sessions (default)
         active_only = await repo.get_by_workspace_unique_id(
-            "ws-010", include_archived=False
+            "ws-010", include_archived=False, test=True
         )
         assert len(active_only) == 3
         
         # Get all sessions including archived
         all_sessions = await repo.get_by_workspace_unique_id(
-            "ws-010", include_archived=True
+            "ws-010", include_archived=True, test=True
         )
         assert len(all_sessions) == 5
 
@@ -423,7 +426,7 @@ class TestConversationSessionRepositoryGetByWorkspaceUniqueId:
         )
         repo = ConversationSessionRepository(db_session)
         
-        results = await repo.get_by_workspace_unique_id("ws-empty")
+        results = await repo.get_by_workspace_unique_id("ws-empty", test=True)
         
         assert len(results) == 0
 
@@ -450,7 +453,7 @@ class TestConversationSessionRepositoryList:
             )
         await db_session.commit()
         
-        results = await repo.list()
+        results = await repo.list(test=True)
         
         assert len(results) == 5
 
@@ -474,15 +477,15 @@ class TestConversationSessionRepositoryList:
         await db_session.commit()
         
         # Get first page
-        page1 = await repo.list(offset=0, limit=3)
+        page1 = await repo.list(offset=0, limit=3, test=True)
         assert len(page1) == 3
         
         # Get second page
-        page2 = await repo.list(offset=3, limit=3)
+        page2 = await repo.list(offset=3, limit=3, test=True)
         assert len(page2) == 3
         
         # Get last page
-        last_page = await repo.list(offset=9, limit=3)
+        last_page = await repo.list(offset=9, limit=3, test=True)
         assert len(last_page) == 1
 
     @pytest.mark.asyncio
@@ -521,11 +524,11 @@ class TestConversationSessionRepositoryList:
         await db_session.commit()
         
         # Filter by project 1
-        results = await repo.list(project_unique_id="proj-filter-001")
+        results = await repo.list(project_unique_id="proj-filter-001", test=True)
         assert len(results) == 3
         
         # Filter by project 2
-        results = await repo.list(project_unique_id="proj-filter-002")
+        results = await repo.list(project_unique_id="proj-filter-002", test=True)
         assert len(results) == 2
 
     @pytest.mark.asyncio
@@ -544,6 +547,7 @@ class TestConversationSessionRepositoryList:
             directory="test-dir2",
             gmt_create=current_time,
             gmt_modified=current_time,
+            test=True,
         )
         db_session.add(workspace2)
         await db_session.flush()
@@ -570,11 +574,11 @@ class TestConversationSessionRepositoryList:
         await db_session.commit()
         
         # Filter by workspace 1
-        results = await repo.list(workspace_unique_id="ws-ws-filter-001")
+        results = await repo.list(workspace_unique_id="ws-ws-filter-001", test=True)
         assert len(results) == 3
         
         # Filter by workspace 2
-        results = await repo.list(workspace_unique_id="ws-ws-filter-002")
+        results = await repo.list(workspace_unique_id="ws-ws-filter-002", test=True)
         assert len(results) == 2
 
     @pytest.mark.asyncio
@@ -609,11 +613,11 @@ class TestConversationSessionRepositoryList:
         await db_session.commit()
         
         # List only active sessions (default)
-        active_only = await repo.list(include_archived=False)
+        active_only = await repo.list(include_archived=False, test=True)
         assert len(active_only) == 3
         
         # List all sessions including archived
-        all_sessions = await repo.list(include_archived=True)
+        all_sessions = await repo.list(include_archived=True, test=True)
         assert len(all_sessions) == 5
 
 
@@ -641,7 +645,7 @@ class TestConversationSessionRepositoryArchive:
         assert session.time_archived is None
         
         # Archive the session
-        archived = await repo.archive("sess-archive")
+        archived = await repo.archive("sess-archive", test=True)
         await db_session.commit()
         
         assert archived is not None
@@ -667,7 +671,7 @@ class TestConversationSessionRepositoryArchive:
         await db_session.commit()
         
         custom_time = 1700000000
-        archived = await repo.archive("sess-archive-custom", archived_time=custom_time)
+        archived = await repo.archive("sess-archive-custom", archived_time=custom_time, test=True)
         await db_session.commit()
         
         assert archived.time_archived == custom_time
@@ -677,7 +681,7 @@ class TestConversationSessionRepositoryArchive:
         """Test archiving a non-existent session."""
         repo = ConversationSessionRepository(db_session)
         
-        result = await repo.archive("non-existent-session")
+        result = await repo.archive("non-existent-session", test=True)
         
         assert result is None
 
@@ -708,7 +712,7 @@ class TestConversationSessionRepositoryUnarchive:
         assert session.time_archived is not None
         
         # Unarchive the session
-        unarchived = await repo.unarchive("sess-unarchive")
+        unarchived = await repo.unarchive("sess-unarchive", test=True)
         await db_session.commit()
         
         assert unarchived is not None
@@ -720,7 +724,7 @@ class TestConversationSessionRepositoryUnarchive:
         """Test unarchiving a non-existent session."""
         repo = ConversationSessionRepository(db_session)
         
-        result = await repo.unarchive("non-existent-session")
+        result = await repo.unarchive("non-existent-session", test=True)
         
         assert result is None
 
@@ -747,7 +751,7 @@ class TestConversationSessionRepositoryCountByProject:
             )
         await db_session.commit()
         
-        count = await repo.count_by_project("proj-count")
+        count = await repo.count_by_project("proj-count", test=True)
         
         assert count == 5
 
@@ -783,11 +787,11 @@ class TestConversationSessionRepositoryCountByProject:
         await db_session.commit()
         
         # Count only active sessions (default)
-        active_count = await repo.count_by_project("proj-count-archive", include_archived=False)
+        active_count = await repo.count_by_project("proj-count-archive", include_archived=False, test=True)
         assert active_count == 3
         
         # Count all sessions including archived
-        total_count = await repo.count_by_project("proj-count-archive", include_archived=True)
+        total_count = await repo.count_by_project("proj-count-archive", include_archived=True, test=True)
         assert total_count == 5
 
     @pytest.mark.asyncio
@@ -800,7 +804,7 @@ class TestConversationSessionRepositoryCountByProject:
         )
         repo = ConversationSessionRepository(db_session)
         
-        count = await repo.count_by_project("proj-count-empty")
+        count = await repo.count_by_project("proj-count-empty", test=True)
         
         assert count == 0
 
@@ -827,7 +831,7 @@ class TestConversationSessionRepositoryCountByWorkspace:
             )
         await db_session.commit()
         
-        count = await repo.count_by_workspace("ws-ws-count")
+        count = await repo.count_by_workspace("ws-ws-count", test=True)
         
         assert count == 5
 
@@ -863,11 +867,11 @@ class TestConversationSessionRepositoryCountByWorkspace:
         await db_session.commit()
         
         # Count only active sessions (default)
-        active_count = await repo.count_by_workspace("ws-ws-count-archive", include_archived=False)
+        active_count = await repo.count_by_workspace("ws-ws-count-archive", include_archived=False, test=True)
         assert active_count == 3
         
         # Count all sessions including archived
-        total_count = await repo.count_by_workspace("ws-ws-count-archive", include_archived=True)
+        total_count = await repo.count_by_workspace("ws-ws-count-archive", include_archived=True, test=True)
         assert total_count == 5
 
 
@@ -893,7 +897,7 @@ class TestConversationSessionRepositoryUpdate:
         )
         await db_session.commit()
         
-        updated = await repo.update(session, title="Updated Title")
+        updated = await repo.update(session, title="Updated Title", test=True)
         await db_session.commit()
         
         assert updated.title == "Updated Title"
@@ -925,6 +929,7 @@ class TestConversationSessionRepositoryUpdate:
             title="Updated",
             directory="new-path",
             gmt_modified=new_time,
+            test=True,
         )
         await db_session.commit()
         
@@ -959,7 +964,7 @@ class TestConversationSessionRepositoryDelete:
         await repo.delete(session)
         await db_session.commit()
         
-        result = await repo.get_by_id(session_id)
+        result = await repo.get_by_id(session_id, test=True)
         assert result is None
 
 
@@ -984,14 +989,14 @@ class TestConversationSessionRepositoryExists:
         )
         await db_session.commit()
         
-        assert await repo.exists(session.id) is True
+        assert await repo.exists(session.id, test=True) is True
 
     @pytest.mark.asyncio
     async def test_exists_false(self, db_session: AsyncSession):
         """Test checking if session exists (False case)."""
         repo = ConversationSessionRepository(db_session)
         
-        assert await repo.exists(99999) is False
+        assert await repo.exists(99999, test=True) is False
 
 
 class TestConversationSessionRepositoryGetByExternalSessionId:
@@ -1016,7 +1021,7 @@ class TestConversationSessionRepositoryGetByExternalSessionId:
         )
         await db_session.commit()
         
-        result = await repo.get_by_external_session_id("external-sess-ext-001")
+        result = await repo.get_by_external_session_id("external-sess-ext-001", test=True)
         
         assert result is not None
         assert result.session_unique_id == "sess-ext-001"
@@ -1028,7 +1033,7 @@ class TestConversationSessionRepositoryGetByExternalSessionId:
         """Test getting a non-existent session by external_session_id."""
         repo = ConversationSessionRepository(db_session)
         
-        result = await repo.get_by_external_session_id("non-existent-external-id")
+        result = await repo.get_by_external_session_id("non-existent-external-id", test=True)
         
         assert result is None
 
@@ -1057,6 +1062,7 @@ class TestConversationSessionRepositoryCreateWithSdkSessionId:
             sdk_session_id="sdk-session-12345",
             gmt_create=current_time,
             gmt_modified=current_time,
+            test=True,
         )
         await db_session.commit()
         
@@ -1094,6 +1100,7 @@ class TestConversationSessionRepositoryUpdateSdkSessionId:
         updated = await repo.update_session(
             session,
             sdk_session_id="new-sdk-session-67890",
+            test=True,
         )
         await db_session.commit()
         

@@ -25,6 +25,7 @@ async def create_test_project(
         branch=branch,
         gmt_create=current_time,
         gmt_modified=current_time,
+        test=True,
     )
 
 
@@ -86,8 +87,8 @@ class TestProjectRepositoryGetById:
         )
         await db_session.commit()
         
-        result = await repo.get_by_id(project.id)
-        
+        result = await repo.get_by_id(project.id, test=True)
+
         assert result is not None
         assert result.id == project.id
         assert result.project_unique_id == "proj-003"
@@ -98,8 +99,8 @@ class TestProjectRepositoryGetById:
         """Test getting a non-existent project by ID."""
         repo = ProjectRepository(db_session)
         
-        result = await repo.get_by_id(99999)
-        
+        result = await repo.get_by_id(99999, test=True)
+
         assert result is None
 
 
@@ -119,8 +120,8 @@ class TestProjectRepositoryGetByUniqueId:
         )
         await db_session.commit()
         
-        result = await repo.get_by_unique_id("unique-proj-001")
-        
+        result = await repo.get_by_unique_id("unique-proj-001", test=True)
+
         assert result is not None
         assert result.project_unique_id == "unique-proj-001"
         assert result.name == "Unique Project"
@@ -130,8 +131,8 @@ class TestProjectRepositoryGetByUniqueId:
         """Test getting a non-existent project by unique ID."""
         repo = ProjectRepository(db_session)
         
-        result = await repo.get_by_unique_id("non-existent-unique-id")
-        
+        result = await repo.get_by_unique_id("non-existent-unique-id", test=True)
+
         assert result is None
 
 
@@ -157,8 +158,8 @@ class TestProjectRepositoryGetByName:
         )
         await db_session.commit()
         
-        results = await repo.get_by_name("Exact Match Project", exact=True)
-        
+        results = await repo.get_by_name("Exact Match Project", exact=True, test=True)
+
         assert len(results) == 1
         assert results[0].name == "Exact Match Project"
 
@@ -187,8 +188,8 @@ class TestProjectRepositoryGetByName:
         )
         await db_session.commit()
         
-        results = await repo.get_by_name("awesome", exact=False)
-        
+        results = await repo.get_by_name("awesome", exact=False, test=True)
+
         assert len(results) == 2
         names = [p.name for p in results]
         assert "My Awesome Project" in names
@@ -209,15 +210,15 @@ class TestProjectRepositoryGetByName:
         await db_session.commit()
         
         # Test lowercase search
-        results = await repo.get_by_name("myproject", exact=False)
+        results = await repo.get_by_name("myproject", exact=False, test=True)
         assert len(results) == 1
-        
+
         # Test uppercase search
-        results = await repo.get_by_name("MYPROJECT", exact=False)
+        results = await repo.get_by_name("MYPROJECT", exact=False, test=True)
         assert len(results) == 1
-        
+
         # Test mixed case search
-        results = await repo.get_by_name("MyPrOjEcT", exact=False)
+        results = await repo.get_by_name("MyPrOjEcT", exact=False, test=True)
         assert len(results) == 1
 
     @pytest.mark.asyncio
@@ -233,8 +234,8 @@ class TestProjectRepositoryGetByName:
         )
         await db_session.commit()
         
-        results = await repo.get_by_name("nonexistent", exact=False)
-        
+        results = await repo.get_by_name("nonexistent", exact=False, test=True)
+
         assert len(results) == 0
 
 
@@ -255,8 +256,8 @@ class TestProjectRepositoryList:
             )
         await db_session.commit()
         
-        results = await repo.list()
-        
+        results = await repo.list(test=True)
+
         assert len(results) == 5
 
     @pytest.mark.asyncio
@@ -274,15 +275,15 @@ class TestProjectRepositoryList:
         await db_session.commit()
         
         # Get first page
-        page1 = await repo.list(offset=0, limit=3)
+        page1 = await repo.list(offset=0, limit=3, test=True)
         assert len(page1) == 3
-        
+
         # Get second page
-        page2 = await repo.list(offset=3, limit=3)
+        page2 = await repo.list(offset=3, limit=3, test=True)
         assert len(page2) == 3
-        
+
         # Get last page
-        last_page = await repo.list(offset=9, limit=3)
+        last_page = await repo.list(offset=9, limit=3, test=True)
         assert len(last_page) == 1
 
     @pytest.mark.asyncio
@@ -310,8 +311,8 @@ class TestProjectRepositoryList:
         )
         await db_session.commit()
         
-        results = await repo.list(name="alpha")
-        
+        results = await repo.list(name="alpha", test=True)
+
         assert len(results) == 2
         names = [p.name for p in results]
         assert "Alpha Project" in names
@@ -333,7 +334,7 @@ class TestProjectRepositoryList:
         await db_session.commit()
         
         # Get first page of filtered results
-        results = await repo.list(offset=0, limit=2, name="Test")
+        results = await repo.list(offset=0, limit=2, name="Test", test=True)
         assert len(results) == 2
 
 
@@ -408,8 +409,8 @@ class TestProjectRepositoryDelete:
         
         await repo.delete(project)
         await db_session.commit()
-        
-        result = await repo.get_by_id(project_id)
+
+        result = await repo.get_by_id(project_id, test=True)
         assert result is None
 
     @pytest.mark.asyncio
@@ -580,8 +581,8 @@ class TestProjectRepositoryCount:
             )
         await db_session.commit()
         
-        count = await repo.count()
-        
+        count = await repo.count(test=True)
+
         assert count == 5
 
     @pytest.mark.asyncio
@@ -609,10 +610,10 @@ class TestProjectRepositoryCount:
         )
         await db_session.commit()
         
-        count = await repo.count(name="Alpha")
+        count = await repo.count(name="Alpha", test=True)
         assert count == 2
-        
-        count = await repo.count(name="Beta")
+
+        count = await repo.count(name="Beta", test=True)
         assert count == 1
 
 
@@ -632,11 +633,11 @@ class TestProjectRepositoryExists:
         )
         await db_session.commit()
         
-        assert await repo.exists(project.id) is True
+        assert await repo.exists(project.id, test=True) is True
 
     @pytest.mark.asyncio
     async def test_exists_false(self, db_session: AsyncSession):
         """Test checking if project exists (False case)."""
         repo = ProjectRepository(db_session)
-        
-        assert await repo.exists(99999) is False
+
+        assert await repo.exists(99999, test=True) is False

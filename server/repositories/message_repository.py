@@ -36,7 +36,8 @@ class MessageRepository(BaseRepository[Message]):
         self,
         session_unique_id: str,
         offset: int = 0,
-        limit: int = 100
+        limit: int = 100,
+        test: bool = False
     ) -> List[Message]:
         """Get all messages for a specific session with pagination.
         
@@ -44,15 +45,17 @@ class MessageRepository(BaseRepository[Message]):
             session_unique_id: The unique identifier of the session.
             offset: Offset for pagination (default: 0).
             limit: Maximum number of results (default: 100).
+            test: Filter by test flag (default: False).
             
         Returns:
             List of messages belonging to the session.
         """
         try:
-            logger.debug(f"get_by_session_unique_id called with session_unique_id={session_unique_id}, offset={offset}, limit={limit}")
+            logger.debug(f"get_by_session_unique_id called with session_unique_id={session_unique_id}, offset={offset}, limit={limit}, test={test}")
             result = await self.session.execute(
                 select(Message)
                 .where(Message.session_unique_id == session_unique_id)
+                .where(Message.test == test)
                 .order_by(Message.gmt_create)
                 .offset(offset)
                 .limit(limit)
@@ -64,19 +67,22 @@ class MessageRepository(BaseRepository[Message]):
             logger.error(f"get_by_session_unique_id failed: {str(e)}")
             raise
     
-    async def get_by_unique_id(self, message_unique_id: str) -> Optional[Message]:
+    async def get_by_unique_id(self, message_unique_id: str, test: bool = False) -> Optional[Message]:
         """Get a message by its unique identifier.
         
         Args:
             message_unique_id: The unique identifier of the message.
+            test: Filter by test flag (default: False).
             
         Returns:
             Message instance if found, None otherwise.
         """
         try:
-            logger.debug(f"get_by_unique_id called with message_unique_id={message_unique_id}")
+            logger.debug(f"get_by_unique_id called with message_unique_id={message_unique_id}, test={test}")
             result = await self.session.execute(
-                select(Message).where(Message.message_unique_id == message_unique_id)
+                select(Message)
+                .where(Message.message_unique_id == message_unique_id)
+                .where(Message.test == test)
             )
             message = result.scalar_one_or_none()
             logger.debug(f"get_by_unique_id returned {type(message).__name__ if message else 'None'}")
@@ -89,7 +95,8 @@ class MessageRepository(BaseRepository[Message]):
         self,
         session_unique_id: str,
         offset: int = 0,
-        limit: int = 100
+        limit: int = 100,
+        test: bool = False
     ) -> List[Message]:
         """List messages for a session with pagination.
         
@@ -99,12 +106,13 @@ class MessageRepository(BaseRepository[Message]):
             session_unique_id: The unique identifier of the session.
             offset: Offset for pagination (default: 0).
             limit: Maximum number of results (default: 100).
+            test: Filter by test flag (default: False).
             
         Returns:
             List of messages belonging to the session.
         """
-        logger.debug(f"list called with session_unique_id={session_unique_id}, offset={offset}, limit={limit}")
-        return await self.get_by_session_unique_id(session_unique_id, offset, limit)
+        logger.debug(f"list called with session_unique_id={session_unique_id}, offset={offset}, limit={limit}, test={test}")
+        return await self.get_by_session_unique_id(session_unique_id, offset, limit, test)
     
     async def create(
         self,
@@ -112,7 +120,8 @@ class MessageRepository(BaseRepository[Message]):
         session_unique_id: str,
         gmt_create: int,
         gmt_modified: int,
-        data: Dict[str, Any]
+        data: Dict[str, Any],
+        test: bool = False
     ) -> Message:
         """Create a new message with JSON data.
         
@@ -122,18 +131,20 @@ class MessageRepository(BaseRepository[Message]):
             gmt_create: Creation timestamp (Unix epoch).
             gmt_modified: Update timestamp (Unix epoch).
             data: Message data dictionary (will be stored as JSON string).
+            test: Test flag for the message (default: False).
             
         Returns:
             Created message instance.
         """
         try:
-            logger.debug(f"create called with message_unique_id={message_unique_id}, session_unique_id={session_unique_id}, gmt_create={gmt_create}, gmt_modified={gmt_modified}")
+            logger.debug(f"create called with message_unique_id={message_unique_id}, session_unique_id={session_unique_id}, gmt_create={gmt_create}, gmt_modified={gmt_modified}, test={test}")
             instance = self.model(
                 message_unique_id=message_unique_id,
                 session_unique_id=session_unique_id,
                 gmt_create=gmt_create,
                 gmt_modified=gmt_modified,
-                data=json.dumps(data, ensure_ascii=False) if isinstance(data, dict) else data
+                data=json.dumps(data, ensure_ascii=False) if isinstance(data, dict) else data,
+                test=test
             )
             self.session.add(instance)
             await self.session.flush()
@@ -147,7 +158,8 @@ class MessageRepository(BaseRepository[Message]):
         self,
         session_unique_id: str,
         last_message_id: int,
-        limit: int = 100
+        limit: int = 100,
+        test: bool = False
     ) -> List[Message]:
         """Get messages with id greater than last_message_id for incremental fetching.
         
@@ -155,16 +167,18 @@ class MessageRepository(BaseRepository[Message]):
             session_unique_id: The unique identifier of the session.
             last_message_id: Only return messages with id > this value.
             limit: Maximum number of results (default: 100).
+            test: Filter by test flag (default: False).
             
         Returns:
             List of messages with id > last_message_id, ordered by gmt_create.
         """
         try:
-            logger.debug(f"get_messages_after_id called with session_unique_id={session_unique_id}, last_message_id={last_message_id}, limit={limit}")
+            logger.debug(f"get_messages_after_id called with session_unique_id={session_unique_id}, last_message_id={last_message_id}, limit={limit}, test={test}")
             result = await self.session.execute(
                 select(Message)
                 .where(Message.session_unique_id == session_unique_id)
                 .where(Message.id > last_message_id)
+                .where(Message.test == test)
                 .order_by(Message.gmt_create)
                 .limit(limit)
             )
@@ -175,19 +189,22 @@ class MessageRepository(BaseRepository[Message]):
             logger.error(f"get_messages_after_id failed: {str(e)}")
             raise
     
-    async def count_by_session(self, session_unique_id: str) -> int:
+    async def count_by_session(self, session_unique_id: str, test: bool = False) -> int:
         """Count messages for a specific session.
         
         Args:
             session_unique_id: The unique identifier of the session.
+            test: Filter by test flag (default: False).
             
         Returns:
             Number of messages in the session.
         """
         try:
-            logger.debug(f"count_by_session called with session_unique_id={session_unique_id}")
+            logger.debug(f"count_by_session called with session_unique_id={session_unique_id}, test={test}")
             result = await self.session.execute(
-                select(Message).where(Message.session_unique_id == session_unique_id)
+                select(Message)
+                .where(Message.session_unique_id == session_unique_id)
+                .where(Message.test == test)
             )
             count = len(result.scalars().all())
             logger.debug(f"count_by_session returned {count}")

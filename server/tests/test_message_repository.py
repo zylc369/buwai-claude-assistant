@@ -76,7 +76,9 @@ async def test_create_message(db_session: AsyncSession, setup_test_data):
         gmt_create=current_time,
         gmt_modified=current_time,
         data=message_data
-    )
+    ,
+            test=True
+        )
     
     assert message.id is not None
     assert message.message_unique_id == "msg_001"
@@ -116,7 +118,9 @@ async def test_create_message_with_complex_data(db_session: AsyncSession, setup_
         gmt_create=current_time,
         gmt_modified=current_time,
         data=message_data
-    )
+    ,
+            test=True
+        )
     
     # Verify complex data structure
     parsed_data = json.loads(message.data)
@@ -138,10 +142,12 @@ async def test_get_by_unique_id_exists(db_session: AsyncSession, setup_test_data
         gmt_create=current_time,
         gmt_modified=current_time,
         data={"role": "user", "content": "Test message"}
-    )
+    ,
+            test=True
+        )
     
     # Get by unique ID
-    result = await repo.get_by_unique_id("msg_003")
+    result = await repo.get_by_unique_id("msg_003", test=True)
     
     assert result is not None
     assert result.message_unique_id == "msg_003"
@@ -153,7 +159,7 @@ async def test_get_by_unique_id_not_exists(db_session: AsyncSession, setup_test_
     """Test getting a non-existent message by unique ID."""
     repo = MessageRepository(db_session)
     
-    result = await repo.get_by_unique_id("non_existent_id")
+    result = await repo.get_by_unique_id("non_existent_id", test=True)
     
     assert result is None
 
@@ -172,10 +178,12 @@ async def test_get_by_session_unique_id(db_session: AsyncSession, setup_test_dat
             gmt_create=current_time + i,
             gmt_modified=current_time + i,
             data={"role": "user", "content": f"Message {i}"}
+        ,
+            test=True
         )
     
     # Get messages for session
-    result = await repo.get_by_session_unique_id("sess_001")
+    result = await repo.get_by_session_unique_id("sess_001", test=True)
     
     assert len(result) == 5
     # Messages should be ordered by gmt_create
@@ -198,14 +206,16 @@ async def test_get_by_session_unique_id_with_pagination(db_session: AsyncSession
             gmt_create=current_time + i,
             gmt_modified=current_time + i,
             data={"role": "user", "content": f"Message {i}"}
+        ,
+            test=True
         )
     
     # Get first 5 messages
-    result = await repo.get_by_session_unique_id("sess_001", offset=0, limit=5)
+    result = await repo.get_by_session_unique_id("sess_001", offset=0, limit=5, test=True)
     assert len(result) == 5
     
     # Get next 5 messages
-    result = await repo.get_by_session_unique_id("sess_001", offset=5, limit=5)
+    result = await repo.get_by_session_unique_id("sess_001", offset=5, limit=5, test=True)
     assert len(result) == 5
 
 
@@ -229,7 +239,7 @@ async def test_get_by_session_unique_id_empty(db_session: AsyncSession, setup_te
     await db_session.flush()
     
     # Get messages for empty session
-    result = await repo.get_by_session_unique_id("sess_002")
+    result = await repo.get_by_session_unique_id("sess_002", test=True)
     
     assert len(result) == 0
 
@@ -248,10 +258,12 @@ async def test_list_method(db_session: AsyncSession, setup_test_data):
             gmt_create=current_time + i,
             gmt_modified=current_time + i,
             data={"role": "user", "content": f"List message {i}"}
+        ,
+            test=True
         )
     
     # Use list method
-    result = await repo.list("sess_001")
+    result = await repo.list("sess_001", test=True)
     
     assert len(result) == 3
 
@@ -270,10 +282,12 @@ async def test_count_by_session(db_session: AsyncSession, setup_test_data):
             gmt_create=current_time + i,
             gmt_modified=current_time + i,
             data={"role": "user", "content": f"Count message {i}"}
+        ,
+            test=True
         )
     
     # Count messages
-    count = await repo.count_by_session("sess_001")
+    count = await repo.count_by_session("sess_001", test=True)
     
     assert count == 7
 
@@ -298,7 +312,7 @@ async def test_count_by_session_empty(db_session: AsyncSession, setup_test_data)
     await db_session.flush()
     
     # Count messages for empty session
-    count = await repo.count_by_session("sess_count_empty")
+    count = await repo.count_by_session("sess_count_empty", test=True)
     
     assert count == 0
 
@@ -326,10 +340,12 @@ async def test_data_field_json_serialization(db_session: AsyncSession, setup_tes
         gmt_create=current_time,
         gmt_modified=current_time,
         data=message_data
-    )
+    ,
+            test=True
+        )
     
     # Retrieve and verify
-    retrieved = await repo.get_by_unique_id("msg_json_test")
+    retrieved = await repo.get_by_unique_id("msg_json_test", test=True)
     parsed_data = json.loads(retrieved.data)
     
     assert parsed_data["string"] == "value"
@@ -354,14 +370,16 @@ async def test_update_message(db_session: AsyncSession, setup_test_data):
         gmt_create=current_time,
         gmt_modified=current_time,
         data={"role": "user", "content": "Original content"}
-    )
+    ,
+            test=True
+        )
     
     # Update message data
     new_data = {"role": "assistant", "content": "Updated content"}
     updated = await repo.update(
         message,
         data=json.dumps(new_data),
-        gmt_modified=current_time + 100
+        gmt_modified=current_time + 100,
     )
     
     parsed_data = json.loads(updated.data)
@@ -382,15 +400,17 @@ async def test_delete_message(db_session: AsyncSession, setup_test_data):
         gmt_create=current_time,
         gmt_modified=current_time,
         data={"role": "user", "content": "To be deleted"}
-    )
+    ,
+            test=True
+        )
     
     # Verify it exists
-    result = await repo.get_by_unique_id("msg_delete_test")
+    result = await repo.get_by_unique_id("msg_delete_test", test=True)
     assert result is not None
     
     # Delete message
     await repo.delete(message)
-    
+
     # Verify it's deleted
-    result = await repo.get_by_unique_id("msg_delete_test")
+    result = await repo.get_by_unique_id("msg_delete_test", test=True)
     assert result is None

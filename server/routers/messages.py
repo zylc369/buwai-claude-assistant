@@ -3,7 +3,7 @@
 import json
 import os
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -87,6 +87,7 @@ async def list_messages(
     offset: int = 0,
     limit: int = 100,
     last_message_id: Optional[int] = None,
+    test: bool = Query(False, description="Use test data"),
     db: AsyncSession = Depends(get_db_session)
 ):
     """List messages for a session with pagination.
@@ -109,13 +110,15 @@ async def list_messages(
         messages = await service.list_messages_after_id(
             session_unique_id=session_unique_id,
             last_message_id=last_message_id,
-            limit=limit
+            limit=limit,
+            test=test
         )
     else:
         messages = await service.list_messages(
             session_unique_id=session_unique_id,
             offset=offset,
-            limit=limit
+            limit=limit,
+            test=test
         )
 
     logger.info(f"list_messages completed: status=200")
@@ -126,6 +129,7 @@ async def list_messages(
 async def get_message(
     request: Request,
     message_unique_id: str,
+    test: bool = Query(False, description="Use test data"),
     db: AsyncSession = Depends(get_db_session)
 ):
     """Get a message by its unique identifier.
@@ -143,7 +147,7 @@ async def get_message(
     logger.debug(f"params: message_unique_id={message_unique_id}")
 
     service = MessageService(db)
-    message = await service.get_message_by_unique_id(message_unique_id)
+    message = await service.get_message_by_unique_id(message_unique_id, test=test)
     if not message:
         logger.error(f"get_message failed: Message not found")
         raise HTTPException(status_code=404, detail="Message not found")
@@ -156,6 +160,7 @@ async def get_message(
 async def send_ai_prompt(
     http_request: Request,
     request: AISendRequest,
+    test: bool = Query(False, description="Use test data"),
     db: AsyncSession = Depends(get_db_session)
 ):
     """Send a prompt to AI and return streaming response.
@@ -188,7 +193,8 @@ async def send_ai_prompt(
             async for chunk in service.send_ai_prompt(
                 prompt=request.prompt,
                 session_unique_id=request.session_unique_id,
-                client_config=client_config
+                client_config=client_config,
+                test=test
             ):
                 # Serialize chunk to JSON for SSE
                 if hasattr(chunk, '__dict__'):
@@ -242,6 +248,7 @@ async def update_message(
     request: Request,
     message_unique_id: str,
     message_data: MessageUpdate,
+    test: bool = Query(False, description="Use test data"),
     db: AsyncSession = Depends(get_db_session)
 ):
     """Update a message's data.
@@ -267,6 +274,7 @@ async def update_message(
 
     message = await service.update_message(
         message_unique_id=message_unique_id,
+        test=test,
         **update_kwargs
     )
 
@@ -282,6 +290,7 @@ async def update_message(
 async def delete_message(
     request: Request,
     message_unique_id: str,
+    test: bool = Query(False, description="Use test data"),
     db: AsyncSession = Depends(get_db_session)
 ):
     """Delete a message.
@@ -299,7 +308,7 @@ async def delete_message(
     logger.debug(f"params: message_unique_id={message_unique_id}")
 
     service = MessageService(db)
-    deleted = await service.delete_message(message_unique_id)
+    deleted = await service.delete_message(message_unique_id, test=test)
     if not deleted:
         logger.error(f"delete_message failed: Message not found")
         raise HTTPException(status_code=404, detail="Message not found")

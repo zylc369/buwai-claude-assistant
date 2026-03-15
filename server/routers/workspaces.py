@@ -47,6 +47,7 @@ class WorkspaceResponse(BaseModel):
 async def create_workspace(
     request: Request,
     workspace_data: WorkspaceCreate,
+    test: bool = Query(False, description="Use test data"),
     db: AsyncSession = Depends(get_db_session)
 ):
     """Create a new workspace."""
@@ -59,7 +60,8 @@ async def create_workspace(
         project_unique_id=workspace_data.project_unique_id,
         branch=workspace_data.branch,
         directory=workspace_data.directory,
-        extra=workspace_data.extra
+        extra=workspace_data.extra,
+        test=test
     )
 
     logger.info(f"create_workspace completed: status=201")
@@ -72,6 +74,7 @@ async def list_workspaces(
     project_unique_id: str = Query(..., description="Project unique ID (required)"),
     offset: int = Query(0, ge=0, description="Offset for pagination"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum number of results"),
+    test: bool = Query(False, description="Use test data"),
     db: AsyncSession = Depends(get_db_session)
 ):
     """Get paginated list of workspaces for a project.
@@ -85,7 +88,8 @@ async def list_workspaces(
     workspaces = await service.list_workspaces(
         project_unique_id=project_unique_id,
         offset=offset,
-        limit=limit
+        limit=limit,
+        test=test
     )
 
     logger.info(f"list_workspaces completed: status=200")
@@ -96,6 +100,7 @@ async def list_workspaces(
 async def get_workspace(
     request: Request,
     workspace_unique_id: str,
+    test: bool = Query(False, description="Use test data"),
     db: AsyncSession = Depends(get_db_session)
 ):
     """Get a specific workspace by unique ID."""
@@ -103,7 +108,7 @@ async def get_workspace(
     logger.debug(f"params: workspace_unique_id={workspace_unique_id}")
 
     service = WorkspaceService(db)
-    workspace = await service.get_workspace_by_unique_id(workspace_unique_id)
+    workspace = await service.get_workspace_by_unique_id(workspace_unique_id, test=test)
     if not workspace:
         logger.error(f"get_workspace failed: Workspace not found")
         raise HTTPException(status_code=404, detail="Workspace not found")
@@ -117,6 +122,7 @@ async def update_workspace(
     request: Request,
     workspace_unique_id: str,
     workspace_data: WorkspaceUpdate,
+    test: bool = Query(False, description="Use test data"),
     db: AsyncSession = Depends(get_db_session)
 ):
     """Update a workspace."""
@@ -124,13 +130,13 @@ async def update_workspace(
     logger.debug(f"params: workspace_unique_id={workspace_unique_id}")
 
     service = WorkspaceService(db)
-    workspace = await service.get_workspace_by_unique_id(workspace_unique_id)
+    workspace = await service.get_workspace_by_unique_id(workspace_unique_id, test=test)
     if not workspace:
         logger.error(f"update_workspace failed: Workspace not found")
         raise HTTPException(status_code=404, detail="Workspace not found")
 
     update_data = {k: v for k, v in workspace_data.model_dump().items() if v is not None}
-    updated_workspace = await service.update_workspace(workspace.id, **update_data)
+    updated_workspace = await service.update_workspace(workspace.id, test=test, **update_data)
     logger.info(f"update_workspace completed: status=200")
     return updated_workspace
 
@@ -139,6 +145,7 @@ async def update_workspace(
 async def delete_workspace(
     request: Request,
     workspace_unique_id: str,
+    test: bool = Query(False, description="Use test data"),
     db: AsyncSession = Depends(get_db_session)
 ):
     """Delete a workspace.
@@ -149,12 +156,12 @@ async def delete_workspace(
     logger.debug(f"params: workspace_unique_id={workspace_unique_id}")
 
     service = WorkspaceService(db)
-    workspace = await service.get_workspace_by_unique_id(workspace_unique_id)
+    workspace = await service.get_workspace_by_unique_id(workspace_unique_id, test=test)
     if not workspace:
         logger.error(f"delete_workspace failed: Workspace not found")
         raise HTTPException(status_code=404, detail="Workspace not found")
 
-    deleted = await service.delete_workspace(workspace.id)
+    deleted = await service.delete_workspace(workspace.id, test=test)
     if not deleted:
         logger.error(f"delete_workspace failed: Failed to delete workspace")
         raise HTTPException(status_code=404, detail="Workspace not found")

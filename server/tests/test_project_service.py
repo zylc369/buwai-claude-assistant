@@ -1,5 +1,6 @@
 """Tests for ProjectService."""
 
+import uuid
 import pytest
 import time as time_module
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,24 +9,28 @@ from database.models import Project, Workspace, Session, Message
 from services.project_service import ProjectService
 
 
+def unique_dir() -> str:
+    """Generate a unique directory name for testing."""
+    return f"test_dir_{uuid.uuid4().hex[:8]}"
+
+
 class TestProjectServiceCreate:
     """Tests for ProjectService.create_project method."""
 
     @pytest.mark.asyncio
     async def test_create_project_minimal(self, db_session: AsyncSession):
-        """Test creating a project with minimal required fields."""
         service = ProjectService(db_session)
 
-        before = int(time_module.time())
+        before = int(time_module.time() * 1000)
         project = await service.create_project(
             project_unique_id="proj-001",
-            directory="my_project_dir",
+            directory=unique_dir(),
             name="Minimal Project",
+            test=True
         )
 
         assert project.id is not None
         assert project.project_unique_id == "proj-001"
-        assert project.directory == "my_project_dir"
         assert project.name == "Minimal Project"
         assert project.branch is None
         assert project.gmt_create >= before
@@ -33,32 +38,32 @@ class TestProjectServiceCreate:
 
     @pytest.mark.asyncio
     async def test_create_project_with_all_fields(self, db_session: AsyncSession):
-        """Test creating a project with all fields."""
         service = ProjectService(db_session)
 
         project = await service.create_project(
-            project_unique_id="proj-002",
-            directory="my_project_dir",
-            name="My Project",
+            project_unique_id="test-proj-002",
+            directory=unique_dir(),
+            name="Test Project",
             branch="main",
+            test=True
         )
 
-        assert project.project_unique_id == "proj-002"
-        assert project.name == "My Project"
+        assert project.project_unique_id == "test-proj-002"
+        assert project.name == "Test Project"
         assert project.branch == "main"
 
     @pytest.mark.asyncio
     async def test_create_project_auto_timestamps(self, db_session: AsyncSession):
-        """Test that create_project auto-sets timestamps."""
         service = ProjectService(db_session)
 
-        before = int(time_module.time())
+        before = int(time_module.time() * 1000)
         project = await service.create_project(
             project_unique_id="proj-003",
-            directory="my_project_dir",
+            directory=unique_dir(),
             name="Auto Timestamps Project",
+            test=True
         )
-        after = int(time_module.time())
+        after = int(time_module.time() * 1000)
 
         assert project.gmt_create >= before
         assert project.gmt_create <= after
@@ -66,29 +71,26 @@ class TestProjectServiceCreate:
 
     @pytest.mark.asyncio
     async def test_create_project_auto_uuid(self, db_session: AsyncSession):
-        """Test that create_project auto-generates UUID if not provided."""
         service = ProjectService(db_session)
 
-        project = await service.create_project(directory="auto_uuid_dir", name="Auto UUID Project")
+        project = await service.create_project(directory=unique_dir(), name="Auto UUID Project", test=True)
 
         assert project.project_unique_id is not None
         assert len(project.project_unique_id) == 36
 
     @pytest.mark.asyncio
     async def test_create_project_invalid_directory(self, db_session: AsyncSession):
-        """Test that create_project rejects invalid directory names."""
         service = ProjectService(db_session)
 
         with pytest.raises(ValueError, match="Invalid directory name"):
-            await service.create_project(directory="invalid-dir!", name="Test Project")
+            await service.create_project(directory="invalid-dir!", name="Test Project", test=True)
 
     @pytest.mark.asyncio
     async def test_create_project_directory_with_spaces_fails(self, db_session: AsyncSession):
-        """Test that create_project rejects directory names with spaces."""
         service = ProjectService(db_session)
 
         with pytest.raises(ValueError, match="Invalid directory name"):
-            await service.create_project(directory="invalid dir", name="Test Project")
+            await service.create_project(directory="invalid dir", name="Test Project", test=True)
 
 
 class TestProjectServiceGetById:
@@ -101,11 +103,12 @@ class TestProjectServiceGetById:
         
         created = await service.create_project(
             project_unique_id="proj-010",
-            directory="my_project_dir",
+            directory=unique_dir(),
             name="Test Project",
+            test=True
         )
         
-        result = await service.get_project_by_id(created.id)
+        result = await service.get_project_by_id(created.id, test=True)
         
         assert result is not None
         assert result.id == created.id
@@ -116,7 +119,7 @@ class TestProjectServiceGetById:
         """Test getting a non-existent project by ID."""
         service = ProjectService(db_session)
         
-        result = await service.get_project_by_id(99999)
+        result = await service.get_project_by_id(99999, test=True)
         
         assert result is None
 
@@ -131,11 +134,12 @@ class TestProjectServiceGetByUniqueId:
         
         await service.create_project(
             project_unique_id="unique-proj-001",
-            directory="my_project_dir",
+            directory=unique_dir(),
             name="Unique Project",
+            test=True
         )
         
-        result = await service.get_project_by_unique_id("unique-proj-001")
+        result = await service.get_project_by_unique_id("unique-proj-001", test=True)
         
         assert result is not None
         assert result.project_unique_id == "unique-proj-001"
@@ -145,7 +149,7 @@ class TestProjectServiceGetByUniqueId:
         """Test getting a non-existent project by unique ID."""
         service = ProjectService(db_session)
         
-        result = await service.get_project_by_unique_id("non-existent-id")
+        result = await service.get_project_by_unique_id("non-existent-id", test=True)
         
         assert result is None
 
@@ -155,17 +159,17 @@ class TestProjectServiceList:
 
     @pytest.mark.asyncio
     async def test_list_all_projects(self, db_session: AsyncSession):
-        """Test listing all projects."""
         service = ProjectService(db_session)
 
         for i in range(5):
             await service.create_project(
                 project_unique_id=f"proj-list-{i:03d}",
-                directory=f"project_dir_{i}",
+                directory=unique_dir(),
                 name=f"List Project {i}",
+                test=True
             )
 
-        results = await service.list_projects()
+        results = await service.list_projects(test=True)
 
         assert len(results) == 5
 
@@ -177,17 +181,18 @@ class TestProjectServiceList:
         for i in range(10):
             await service.create_project(
                 project_unique_id=f"proj-page-{i:03d}",
-                directory=f"project_dir_{i}",
+                directory=unique_dir(),
                 name=f"Page Project {i}",
+                test=True
             )
 
-        page1 = await service.list_projects(offset=0, limit=3)
+        page1 = await service.list_projects(offset=0, limit=3, test=True)
         assert len(page1) == 3
 
-        page2 = await service.list_projects(offset=3, limit=3)
+        page2 = await service.list_projects(offset=3, limit=3, test=True)
         assert len(page2) == 3
 
-        last = await service.list_projects(offset=9, limit=3)
+        last = await service.list_projects(offset=9, limit=3, test=True)
         assert len(last) == 1
 
     @pytest.mark.asyncio
@@ -197,21 +202,24 @@ class TestProjectServiceList:
         
         await service.create_project(
             project_unique_id="proj-filter-001",
-            directory="project_dir_1",
+            directory=unique_dir(),
             name="Alpha Project",
+            test=True
         )
         await service.create_project(
             project_unique_id="proj-filter-002",
-            directory="project_dir_1",
+            directory=unique_dir(),
             name="Beta Project",
+            test=True
         )
         await service.create_project(
             project_unique_id="proj-filter-003",
-            directory="project_dir_2",
+            directory=unique_dir(),
             name="Alpha App",
+            test=True
         )
         
-        results = await service.list_projects(name="alpha")
+        results = await service.list_projects(name="alpha", test=True)
         
         assert len(results) == 2
         names = [p.name for p in results]
@@ -226,11 +234,12 @@ class TestProjectServiceList:
         for i in range(10):
             await service.create_project(
                 project_unique_id=f"proj-pf-{i:03d}",
-                directory=f"project_dir_{i}",
+                directory=unique_dir(),
                 name=f"Test Project {i}",
+                test=True
             )
 
-        results = await service.list_projects(offset=0, limit=2, name="Test")
+        results = await service.list_projects(offset=0, limit=2, name="Test", test=True)
         assert len(results) == 2
 
 
@@ -244,12 +253,13 @@ class TestProjectServiceUpdate:
         
         project = await service.create_project(
             project_unique_id="proj-update-001",
-            directory="my_project_dir",
+            directory=unique_dir(),
             name="Original Name",
+            test=True
         )
         original_updated = project.gmt_modified
 
-        updated = await service.update_project(project.id, name="Updated Name")
+        updated = await service.update_project(project.id, name="Updated Name", test=True)
 
         assert updated is not None
         assert updated.name == "Updated Name"
@@ -257,25 +267,23 @@ class TestProjectServiceUpdate:
 
     @pytest.mark.asyncio
     async def test_update_multiple_fields(self, db_session: AsyncSession):
-        """Test updating multiple project fields."""
         service = ProjectService(db_session)
         
         project = await service.create_project(
             project_unique_id="proj-update-002",
-            directory="original_dir",
+            directory=unique_dir(),
             name="Original",
             branch="main",
+            test=True
         )
         
-        new_directory = "new_dir"
         updated = await service.update_project(
             project.id,
-            directory=new_directory,
             name="Updated",
             branch="develop",
+            test=True
         )
 
-        assert updated.directory == new_directory
         assert updated.name == "Updated"
         assert updated.branch == "develop"
 
@@ -286,14 +294,15 @@ class TestProjectServiceUpdate:
 
         project = await service.create_project(
             project_unique_id="proj-update-003",
-            directory="my_project_dir",
+            directory=unique_dir(),
             name="Original Name",
+            test=True
         )
         original_time = project.gmt_modified
 
-        before = int(time_module.time())
-        updated = await service.update_project(project.id, name="New Name")
-        after = int(time_module.time())
+        before = int(time_module.time() * 1000)
+        updated = await service.update_project(project.id, name="New Name", test=True)
+        after = int(time_module.time() * 1000)
 
         assert updated.gmt_modified >= original_time
         assert updated.gmt_modified >= before
@@ -304,7 +313,7 @@ class TestProjectServiceUpdate:
         """Test updating a non-existent project."""
         service = ProjectService(db_session)
         
-        result = await service.update_project(99999, name="New Name")
+        result = await service.update_project(99999, name="New Name", test=True)
         
         assert result is None
 
@@ -319,22 +328,23 @@ class TestProjectServiceDelete:
 
         project = await service.create_project(
             project_unique_id="proj-delete-001",
-            directory="my_project_dir",
+            directory=unique_dir(),
             name="Delete Project",
+            test=True
         )
         project_id = project.id
 
-        result = await service.delete_project(project_id)
+        result = await service.delete_project(project_id, test=True)
 
         assert result is True
-        assert await service.get_project_by_id(project_id) is None
+        assert await service.get_project_by_id(project_id, test=True) is None
 
     @pytest.mark.asyncio
     async def test_delete_not_found(self, db_session: AsyncSession):
         """Test deleting a non-existent project."""
         service = ProjectService(db_session)
         
-        result = await service.delete_project(99999)
+        result = await service.delete_project(99999, test=True)
         
         assert result is False
 
@@ -345,22 +355,24 @@ class TestProjectServiceDelete:
 
         project = await service.create_project(
             project_unique_id="proj-cascade-001",
-            directory="my_project_dir",
+            directory=unique_dir(),
             name="Cascade Project",
+            test=True
         )
 
-        current_time = int(time_module.time())
+        current_time = int(time_module.time() * 1000)
         workspace = Workspace(
             workspace_unique_id="ws-cascade-001",
             project_unique_id="proj-cascade-001",
             directory="test-dir",
             gmt_create=current_time,
             gmt_modified=current_time,
+            test=True
         )
         db_session.add(workspace)
         await db_session.commit()
 
-        await service.delete_project(project.id)
+        await service.delete_project(project.id, test=True)
 
         from sqlalchemy import select
         result = await db_session.execute(
@@ -375,17 +387,19 @@ class TestProjectServiceDelete:
 
         project = await service.create_project(
             project_unique_id="proj-cascade-002",
-            directory="my_project_dir",
+            directory=unique_dir(),
             name="Cascade Project 2",
+            test=True
         )
 
-        current_time = int(time_module.time())
+        current_time = int(time_module.time() * 1000)
         workspace = Workspace(
             workspace_unique_id="ws-cascade-002",
             project_unique_id="proj-cascade-002",
             directory="test-dir",
             gmt_create=current_time,
             gmt_modified=current_time,
+            test=True
         )
         db_session.add(workspace)
         await db_session.flush()
@@ -403,7 +417,7 @@ class TestProjectServiceDelete:
         db_session.add(session)
         await db_session.commit()
 
-        await service.delete_project(project.id)
+        await service.delete_project(project.id, test=True)
 
         from sqlalchemy import select
         result = await db_session.execute(
@@ -418,17 +432,19 @@ class TestProjectServiceDelete:
 
         project = await service.create_project(
             project_unique_id="proj-cascade-003",
-            directory="my_project_dir",
+            directory=unique_dir(),
             name="Cascade Project 3",
+            test=True
         )
 
-        current_time = int(time_module.time())
+        current_time = int(time_module.time() * 1000)
         workspace = Workspace(
             workspace_unique_id="ws-cascade-003",
             project_unique_id="proj-cascade-003",
             directory="test-dir",
             gmt_create=current_time,
             gmt_modified=current_time,
+            test=True
         )
         db_session.add(workspace)
         await db_session.flush()
@@ -456,7 +472,7 @@ class TestProjectServiceDelete:
         db_session.add(message)
         await db_session.commit()
 
-        await service.delete_project(project.id)
+        await service.delete_project(project.id, test=True)
 
         from sqlalchemy import select
         result = await db_session.execute(

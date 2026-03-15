@@ -69,7 +69,7 @@ async def test_create_message(db_session: AsyncSession, setup_test_data):
         message_unique_id="msg_svc_001",
         session_unique_id="sess_svc_001",
         data=message_data
-    )
+    , test=True)
     
     assert message.id is not None
     assert message.message_unique_id == "msg_svc_001"
@@ -93,7 +93,7 @@ async def test_create_message_with_custom_timestamps(db_session: AsyncSession, s
         data={"role": "assistant", "content": "Response"},
         gmt_create=custom_time,
         gmt_modified=custom_time + 100
-    )
+    , test=True)
     
     assert message.gmt_create == custom_time
     assert message.gmt_modified == custom_time + 100
@@ -107,9 +107,9 @@ async def test_get_message_by_id(db_session: AsyncSession, setup_test_data):
         message_unique_id="msg_svc_get_id",
         session_unique_id="sess_svc_001",
         data={"role": "user", "content": "Test"}
-    )
+    , test=True)
     
-    found = await service.get_message_by_id(created.id)
+    found = await service.get_message_by_id(created.id, test=True)
     
     assert found is not None
     assert found.id == created.id
@@ -120,7 +120,7 @@ async def test_get_message_by_id(db_session: AsyncSession, setup_test_data):
 async def test_get_message_by_id_not_found(db_session: AsyncSession, setup_test_data):
     service = MessageService(db_session)
     
-    found = await service.get_message_by_id(99999)
+    found = await service.get_message_by_id(99999, test=True)
     
     assert found is None
 
@@ -133,9 +133,9 @@ async def test_get_message_by_unique_id(db_session: AsyncSession, setup_test_dat
         message_unique_id="msg_unique_test",
         session_unique_id="sess_svc_001",
         data={"role": "user", "content": "Unique test"}
-    )
+    , test=True)
     
-    found = await service.get_message_by_unique_id("msg_unique_test")
+    found = await service.get_message_by_unique_id("msg_unique_test", test=True)
     
     assert found is not None
     assert found.message_unique_id == "msg_unique_test"
@@ -145,7 +145,7 @@ async def test_get_message_by_unique_id(db_session: AsyncSession, setup_test_dat
 async def test_get_message_by_unique_id_not_found(db_session: AsyncSession, setup_test_data):
     service = MessageService(db_session)
     
-    found = await service.get_message_by_unique_id("non_existent_id")
+    found = await service.get_message_by_unique_id("non_existent_id", test=True)
     
     assert found is None
 
@@ -159,9 +159,9 @@ async def test_list_messages(db_session: AsyncSession, setup_test_data):
             message_unique_id=f"msg_list_{i}",
             session_unique_id="sess_svc_001",
             data={"role": "user", "content": f"Message {i}"}
-        )
+        , test=True)
     
-    messages = await service.list_messages(session_unique_id="sess_svc_001")
+    messages = await service.list_messages(session_unique_id="sess_svc_001", test=True)
     
     assert len(messages) == 5
     contents = [json.loads(m.data)["content"] for m in messages]
@@ -178,20 +178,20 @@ async def test_list_messages_with_pagination(db_session: AsyncSession, setup_tes
             message_unique_id=f"msg_page_{i}",
             session_unique_id="sess_svc_001",
             data={"role": "user", "content": f"Message {i}"}
-        )
+        , test=True)
     
     first_page = await service.list_messages(
         session_unique_id="sess_svc_001",
         offset=0,
         limit=5
-    )
+    , test=True)
     assert len(first_page) == 5
     
     second_page = await service.list_messages(
         session_unique_id="sess_svc_001",
         offset=5,
         limit=5
-    )
+    , test=True)
     assert len(second_page) == 5
 
 
@@ -212,7 +212,7 @@ async def test_list_messages_empty_session(db_session: AsyncSession, setup_test_
     db_session.add(new_session)
     await db_session.flush()
     
-    messages = await service.list_messages(session_unique_id="sess_empty")
+    messages = await service.list_messages(session_unique_id="sess_empty", test=True)
     
     assert len(messages) == 0
 
@@ -226,9 +226,9 @@ async def test_count_messages(db_session: AsyncSession, setup_test_data):
             message_unique_id=f"msg_count_{i}",
             session_unique_id="sess_svc_001",
             data={"role": "user", "content": f"Count {i}"}
-        )
+        , test=True)
     
-    count = await service.count_messages(session_unique_id="sess_svc_001")
+    count = await service.count_messages(session_unique_id="sess_svc_001", test=True)
     
     assert count == 7
 
@@ -241,12 +241,12 @@ async def test_update_message(db_session: AsyncSession, setup_test_data):
         message_unique_id="msg_to_update",
         session_unique_id="sess_svc_001",
         data={"role": "user", "content": "Original"}
-    )
+    , test=True)
     
     updated = await service.update_message(
         message_unique_id="msg_to_update",
         data={"role": "assistant", "content": "Updated"}
-    )
+    , test=True)
     
     assert updated is not None
     parsed_data = json.loads(updated.data)
@@ -261,7 +261,7 @@ async def test_update_message_not_found(db_session: AsyncSession, setup_test_dat
     result = await service.update_message(
         message_unique_id="non_existent",
         data={"role": "user", "content": "Test"}
-    )
+    , test=True)
     
     assert result is None
 
@@ -274,12 +274,12 @@ async def test_delete_message(db_session: AsyncSession, setup_test_data):
         message_unique_id="msg_to_delete",
         session_unique_id="sess_svc_001",
         data={"role": "user", "content": "To delete"}
-    )
+    , test=True)
     
-    deleted = await service.delete_message("msg_to_delete")
+    deleted = await service.delete_message("msg_to_delete", test=True)
     assert deleted is True
     
-    found = await service.get_message_by_unique_id("msg_to_delete")
+    found = await service.get_message_by_unique_id("msg_to_delete", test=True)
     assert found is None
 
 
@@ -287,7 +287,7 @@ async def test_delete_message(db_session: AsyncSession, setup_test_data):
 async def test_delete_message_not_found(db_session: AsyncSession, setup_test_data):
     service = MessageService(db_session)
     
-    deleted = await service.delete_message("non_existent_id")
+    deleted = await service.delete_message("non_existent_id", test=True)
     assert deleted is False
 
 

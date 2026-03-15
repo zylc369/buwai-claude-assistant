@@ -268,18 +268,25 @@ def get_config_path() -> Path:
     """Get configuration file path based on environment settings.
     
     Resolution order:
-    1. APP_CONFIG_PATH environment variable (if set)
-    2. application-{profile}.yml if APP_PROFILE is set
-    3. application.yml (default)
+    1. If APP_CONFIG_PATH is set:
+       - With APP_PROFILE: use directory from APP_CONFIG_PATH with profile suffix
+       - Without APP_PROFILE: use APP_CONFIG_PATH directly
+    2. If APP_PROFILE is set: application-{profile}.yml
+    3. Default: application.yml
     
     Returns:
         Path to the configuration file to load.
     """
     custom_path = os.getenv("APP_CONFIG_PATH")
-    if custom_path:
-        return Path(custom_path)
-    
     profile = get_active_profile()
+    
+    if custom_path:
+        custom = Path(custom_path)
+        if profile:
+            # Use directory from APP_CONFIG_PATH with profile suffix
+            return custom.parent / f"application-{profile}.yml"
+        return custom
+    
     if profile:
         return Path(__file__).parent / f"application-{profile}.yml"
     return Path(__file__).parent / "application.yml"

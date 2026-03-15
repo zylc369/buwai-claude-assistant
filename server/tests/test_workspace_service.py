@@ -35,6 +35,8 @@ async def db_session():
 async def sample_project(db_session: AsyncSession):
     """Create a sample project for testing."""
     project_dir = Path(PROJECTS_ROOT) / "worktree"
+    if project_dir.exists():
+        shutil.rmtree(project_dir)
     project_dir.mkdir(parents=True, exist_ok=True)
     
     project = Project(
@@ -43,17 +45,22 @@ async def sample_project(db_session: AsyncSession):
         branch="main",
         name="Test Project",
         gmt_create=1000000,
-        gmt_modified=1000000
+        gmt_modified=1000000,
+        test=True
     )
     db_session.add(project)
     await db_session.commit()
-    return project
+    yield project
+    if project_dir.exists():
+        shutil.rmtree(project_dir)
 
 
 @pytest_asyncio.fixture
 async def sample_project2(db_session: AsyncSession):
     """Create a second sample project for testing."""
     project_dir = Path(PROJECTS_ROOT) / "worktree2"
+    if project_dir.exists():
+        shutil.rmtree(project_dir)
     project_dir.mkdir(parents=True, exist_ok=True)
     
     project = Project(
@@ -62,11 +69,14 @@ async def sample_project2(db_session: AsyncSession):
         branch="develop",
         name="Another Project",
         gmt_create=1000000,
-        gmt_modified=1000000
+        gmt_modified=1000000,
+        test=True
     )
     db_session.add(project)
     await db_session.commit()
-    return project
+    yield project
+    if project_dir.exists():
+        shutil.rmtree(project_dir)
 
 
 class TestWorkspaceServiceCreate:
@@ -82,7 +92,8 @@ class TestWorkspaceServiceCreate:
         workspace = await service.create_workspace(
             workspace_unique_id="ws-001",
             project_unique_id="proj-001",
-            directory="test-workspace"
+            directory="test-workspace",
+            test=True
         )
 
         assert workspace.id is not None
@@ -101,13 +112,14 @@ class TestWorkspaceServiceCreate:
             project_unique_id="proj-001",
             branch="feature/test",
             directory="workspace",
-            extra='{"key": "value"}'
+            extra='{"key": "value"}',
+            test=True
         )
 
         assert workspace.id is not None
         assert workspace.workspace_unique_id == "ws-001"
         assert workspace.branch == "feature/test"
-        assert workspace.directory == "/path/to/workspace"
+        assert workspace.directory == "workspace"
         assert workspace.extra == '{"key": "value"}'
 
 
@@ -124,10 +136,11 @@ class TestWorkspaceServiceGetById:
         created = await service.create_workspace(
             workspace_unique_id="ws-001",
             project_unique_id="proj-001",
-            directory="test-workspace"
+            directory="test-workspace",
+            test=True
         )
 
-        found = await service.get_workspace_by_id(created.id)
+        found = await service.get_workspace_by_id(created.id, test=True)
 
         assert found is not None
         assert found.id == created.id
@@ -138,7 +151,7 @@ class TestWorkspaceServiceGetById:
         """Test getting a workspace by non-existent ID."""
         service = WorkspaceService(db_session)
 
-        found = await service.get_workspace_by_id(999)
+        found = await service.get_workspace_by_id(999, test=True)
 
         assert found is None
 
@@ -156,10 +169,11 @@ class TestWorkspaceServiceGetByUniqueId:
         await service.create_workspace(
             workspace_unique_id="ws-001",
             project_unique_id="proj-001",
-            directory="test-workspace"
+            directory="test-workspace",
+            test=True
         )
 
-        found = await service.get_workspace_by_unique_id("ws-001")
+        found = await service.get_workspace_by_unique_id("ws-001", test=True)
 
         assert found is not None
         assert found.workspace_unique_id == "ws-001"
@@ -171,7 +185,7 @@ class TestWorkspaceServiceGetByUniqueId:
         """Test getting a workspace by non-existent unique_id."""
         service = WorkspaceService(db_session)
 
-        found = await service.get_workspace_by_unique_id("non-existent")
+        found = await service.get_workspace_by_unique_id("non-existent", test=True)
 
         assert found is None
 
@@ -189,15 +203,17 @@ class TestWorkspaceServiceList:
         await service.create_workspace(
             workspace_unique_id="ws-001",
             project_unique_id="proj-001",
-            directory="test-workspace1"
+            directory="test-workspace1",
+            test=True
         )
         await service.create_workspace(
             workspace_unique_id="ws-002",
             project_unique_id="proj-001",
-            directory="workspace2"
+            directory="workspace2",
+            test=True
         )
 
-        workspaces = await service.list_workspaces("proj-001")
+        workspaces = await service.list_workspaces("proj-001", test=True)
 
         assert len(workspaces) == 2
 
@@ -208,7 +224,7 @@ class TestWorkspaceServiceList:
         """Test listing workspaces when project has none."""
         service = WorkspaceService(db_session)
 
-        workspaces = await service.list_workspaces("proj-001")
+        workspaces = await service.list_workspaces("proj-001", test=True)
 
         assert len(workspaces) == 0
 
@@ -225,15 +241,17 @@ class TestWorkspaceServiceList:
         await service.create_workspace(
             workspace_unique_id="ws-001",
             project_unique_id="proj-001",
-            directory="test-workspace1"
+            directory="test-workspace1",
+            test=True
         )
         await service.create_workspace(
             workspace_unique_id="ws-002",
             project_unique_id="proj-002",
-            directory="workspace2"
+            directory="workspace2",
+            test=True
         )
 
-        workspaces = await service.list_workspaces("proj-001")
+        workspaces = await service.list_workspaces("proj-001", test=True)
 
         assert len(workspaces) == 1
         assert workspaces[0].project_unique_id == "proj-001"
@@ -249,12 +267,13 @@ class TestWorkspaceServiceList:
             await service.create_workspace(
                 workspace_unique_id=f"ws-{i:03d}",
                 project_unique_id="proj-001",
-                directory=f"workspace{i}"
+                directory=f"workspace{i}",
+                test=True
             )
 
-        page1 = await service.list_workspaces("proj-001", offset=0, limit=2)
-        page2 = await service.list_workspaces("proj-001", offset=2, limit=2)
-        page3 = await service.list_workspaces("proj-001", offset=4, limit=2)
+        page1 = await service.list_workspaces("proj-001", offset=0, limit=2, test=True)
+        page2 = await service.list_workspaces("proj-001", offset=2, limit=2, test=True)
+        page3 = await service.list_workspaces("proj-001", offset=4, limit=2, test=True)
 
         assert len(page1) == 2
         assert len(page2) == 2
@@ -274,12 +293,14 @@ class TestWorkspaceServiceUpdate:
         created = await service.create_workspace(
             workspace_unique_id="ws-001",
             project_unique_id="proj-001",
-            directory="test-workspace"
+            directory="test-workspace",
+            test=True
         )
 
         updated = await service.update_workspace(
             created.id,
-            branch="new-branch"
+            branch="new-branch",
+            test=True
         )
 
         assert updated is not None
@@ -290,7 +311,7 @@ class TestWorkspaceServiceUpdate:
         """Test updating a non-existent workspace."""
         service = WorkspaceService(db_session)
 
-        updated = await service.update_workspace(999, name="New Name")
+        updated = await service.update_workspace(999, name="New Name", test=True)
 
         assert updated is None
 
@@ -308,14 +329,15 @@ class TestWorkspaceServiceDelete:
         created = await service.create_workspace(
             workspace_unique_id="ws-001",
             project_unique_id="proj-001",
-            directory="test-workspace"
+            directory="test-workspace",
+            test=True
         )
 
-        result = await service.delete_workspace(created.id)
+        result = await service.delete_workspace(created.id, test=True)
 
         assert result is True
 
-        found = await service.get_workspace_by_id(created.id)
+        found = await service.get_workspace_by_id(created.id, test=True)
         assert found is None
 
     @pytest.mark.asyncio
@@ -323,7 +345,7 @@ class TestWorkspaceServiceDelete:
         """Test deleting a non-existent workspace."""
         service = WorkspaceService(db_session)
 
-        result = await service.delete_workspace(999)
+        result = await service.delete_workspace(999, test=True)
 
         assert result is False
 
@@ -337,7 +359,8 @@ class TestWorkspaceServiceDelete:
         workspace = await service.create_workspace(
             workspace_unique_id="ws-001",
             project_unique_id="proj-001",
-            directory="test-workspace"
+            directory="test-workspace",
+            test=True
         )
 
         session = Session(
@@ -353,7 +376,7 @@ class TestWorkspaceServiceDelete:
         db_session.add(session)
         await db_session.commit()
 
-        await service.delete_workspace(workspace.id)
+        await service.delete_workspace(workspace.id, test=True)
 
         from sqlalchemy import select
         stmt = select(Session).where(Session.session_unique_id == "sess-001")
@@ -374,15 +397,17 @@ class TestWorkspaceServiceSearch:
         await service.create_workspace(
             workspace_unique_id="ws-001",
             project_unique_id="proj-001",
-            directory="workspace1"
+            directory="workspace1",
+            test=True
         )
         await service.create_workspace(
             workspace_unique_id="ws-002",
             project_unique_id="proj-001",
-            directory="workspace2"
+            directory="workspace2",
+            test=True
         )
 
-        results = await service.search_workspaces("workspace1")
+        results = await service.search_workspaces("workspace1", test=True)
 
         assert len(results) == 1
         assert results[0].directory == "workspace1"
@@ -397,10 +422,11 @@ class TestWorkspaceServiceSearch:
         await service.create_workspace(
             workspace_unique_id="ws-001",
             project_unique_id="proj-001",
-            directory="test-workspace"
+            directory="test-workspace",
+            test=True
         )
 
-        results = await service.search_workspaces("WORKSPACE")
+        results = await service.search_workspaces("WORKSPACE", test=True)
 
         assert len(results) == 1
         assert results[0].directory == "test-workspace"
@@ -418,15 +444,17 @@ class TestWorkspaceServiceSearch:
         await service.create_workspace(
             workspace_unique_id="ws-001",
             project_unique_id="proj-001",
-            directory="workspace1"
+            directory="workspace1",
+            test=True
         )
         await service.create_workspace(
             workspace_unique_id="ws-002",
             project_unique_id="proj-002",
-            directory="workspace2"
+            directory="workspace2",
+            test=True
         )
 
-        results = await service.search_workspaces("workspace1", project_unique_id="proj-001")
+        results = await service.search_workspaces("workspace1", project_unique_id="proj-001", test=True)
 
         assert len(results) == 1
         assert results[0].project_unique_id == "proj-001"
@@ -441,10 +469,11 @@ class TestWorkspaceServiceSearch:
         await service.create_workspace(
             workspace_unique_id="ws-001",
             project_unique_id="proj-001",
-            directory="test-workspace"
+            directory="test-workspace",
+            test=True
         )
 
-        results = await service.search_workspaces("work")
+        results = await service.search_workspaces("work", test=True)
 
         assert len(results) == 1
         assert results[0].directory == "test-workspace"

@@ -88,6 +88,7 @@ class ProjectService:
         name: str,
         branch: Optional[str] = None,
         project_unique_id: Optional[str] = None,
+        test: bool = False,
     ) -> Project:
         logger.debug(f"create_project called with directory={directory}")
         self._validate_directory(directory)
@@ -109,6 +110,7 @@ class ProjectService:
                 branch=branch,
                 gmt_create=current_time,
                 gmt_modified=current_time,
+                test=test,
             )
 
             await self.session.commit()
@@ -126,17 +128,17 @@ class ProjectService:
                 logger.warning(f"Failed to rollback directory {created_path}: {rollback_error}")
             raise
     
-    async def get_project_by_id(self, project_id: int) -> Optional[Project]:
+    async def get_project_by_id(self, project_id: int, test: bool = False) -> Optional[Project]:
         logger.debug(f"get_project_by_id called with project_id={project_id}")
-        result = await self.project_repo.get_by_id(project_id)
+        result = await self.project_repo.get_by_id(project_id, test=test)
         logger.debug(f"get_project_by_id completed, found={result is not None}")
         return result
 
     async def get_project_by_unique_id(
-        self, project_unique_id: str
+        self, project_unique_id: str, test: bool = False
     ) -> Optional[Project]:
         logger.debug(f"get_project_by_unique_id called with project_unique_id={project_unique_id}")
-        result = await self.project_repo.get_by_unique_id(project_unique_id)
+        result = await self.project_repo.get_by_unique_id(project_unique_id, test=test)
         logger.debug(f"get_project_by_unique_id completed, found={result is not None}")
         return result
 
@@ -145,12 +147,14 @@ class ProjectService:
         offset: int = 0,
         limit: int = 100,
         name: Optional[str] = None,
+        test: bool = False,
     ) -> List[Project]:
         logger.debug(f"list_projects called with offset={offset}, limit={limit}, name={name}")
         result = await self.project_repo.list(
             offset=offset,
             limit=limit,
             name=name,
+            test=test,
         )
         logger.debug(f"list_projects completed, returned {len(result)} projects")
         return result
@@ -158,10 +162,11 @@ class ProjectService:
     async def update_project(
         self,
         project_id: int,
+        test: bool = False,
         **kwargs
     ) -> Optional[Project]:
         logger.debug(f"update_project called with project_id={project_id}")
-        project = await self.project_repo.get_by_id(project_id)
+        project = await self.project_repo.get_by_id(project_id, test=test)
         if not project:
             logger.debug(f"update_project completed, project not found")
             return None
@@ -179,9 +184,9 @@ class ProjectService:
         logger.debug(f"update_project completed")
         return updated
 
-    async def update_latest_active_time(self, project_unique_id: str) -> Optional[Project]:
+    async def update_latest_active_time(self, project_unique_id: str, test: bool = False) -> Optional[Project]:
         logger.debug(f"update_latest_active_time called for {project_unique_id}")
-        project = await self.project_repo.get_by_unique_id(project_unique_id)
+        project = await self.project_repo.get_by_unique_id(project_unique_id, test=test)
         if not project:
             logger.debug(f"update_latest_active_time completed, project not found")
             return None
@@ -197,9 +202,9 @@ class ProjectService:
         logger.debug(f"update_latest_active_time completed")
         return updated
 
-    async def delete_project(self, project_id: int) -> bool:
+    async def delete_project(self, project_id: int, test: bool = False) -> bool:
         logger.debug(f"delete_project called with project_id={project_id}")
-        project = await self.project_repo.get_by_id(project_id)
+        project = await self.project_repo.get_by_id(project_id, test=test)
         if not project:
             logger.debug(f"delete_project completed, project not found")
             return False

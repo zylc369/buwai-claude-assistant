@@ -33,19 +33,20 @@ class ConversationSessionRepository(BaseRepository[Session]):
         self.model = Session
         logger.debug("ConversationSessionRepository initialized")
     
-    async def get_by_unique_id(self, session_unique_id: str) -> Optional[Session]:
+    async def get_by_unique_id(self, session_unique_id: str, test: bool = False) -> Optional[Session]:
         """Get a session by its unique identifier.
 
         Args:
             session_unique_id: The unique identifier of the session.
+            test: Filter by test flag (default: False).
 
         Returns:
             Session instance if found, None otherwise.
         """
         try:
-            logger.debug(f"get_by_unique_id called with session_unique_id={session_unique_id}")
+            logger.debug(f"get_by_unique_id called with session_unique_id={session_unique_id}, test={test}")
             result = await self.session.execute(
-                select(Session).where(Session.session_unique_id == session_unique_id)
+                select(Session).where(Session.session_unique_id == session_unique_id, Session.test == test)
             )
             session = result.scalar_one_or_none()
             logger.debug(f"get_by_unique_id returned {type(session).__name__ if session else 'None'}")
@@ -55,20 +56,21 @@ class ConversationSessionRepository(BaseRepository[Session]):
             raise
 
     async def get_by_external_session_id(
-        self, external_session_id: str
+        self, external_session_id: str, test: bool = False
     ) -> Optional[Session]:
         """Get a session by its external session identifier.
 
         Args:
             external_session_id: The external session identifier.
+            test: Filter by test flag (default: False).
 
         Returns:
             Session instance if found, None otherwise.
         """
         try:
-            logger.debug(f"get_by_external_session_id called with external_session_id={external_session_id}")
+            logger.debug(f"get_by_external_session_id called with external_session_id={external_session_id}, test={test}")
             result = await self.session.execute(
-                select(Session).where(Session.external_session_id == external_session_id)
+                select(Session).where(Session.external_session_id == external_session_id, Session.test == test)
             )
             session = result.scalar_one_or_none()
             logger.debug(f"get_by_external_session_id returned {type(session).__name__ if session else 'None'}")
@@ -88,6 +90,7 @@ class ConversationSessionRepository(BaseRepository[Session]):
         sdk_session_id: Optional[str] = None,
         gmt_create: Optional[int] = None,
         gmt_modified: Optional[int] = None,
+        test: bool = False,
     ) -> Session:
         """Create a new session.
 
@@ -101,12 +104,13 @@ class ConversationSessionRepository(BaseRepository[Session]):
             sdk_session_id: SDK session identifier (optional).
             gmt_create: Creation timestamp (defaults to current time).
             gmt_modified: Update timestamp (defaults to current time).
+            test: Whether this is a test session (default: False).
 
         Returns:
             Created Session instance.
         """
         try:
-            logger.debug(f"create_session called with session_unique_id={session_unique_id}, project_unique_id={project_unique_id}, workspace_unique_id={workspace_unique_id}")
+            logger.debug(f"create_session called with session_unique_id={session_unique_id}, project_unique_id={project_unique_id}, workspace_unique_id={workspace_unique_id}, test={test}")
             if gmt_create is None or gmt_modified is None:
                 current_time = get_timestamp_ms()
                 if gmt_create is None:
@@ -124,6 +128,7 @@ class ConversationSessionRepository(BaseRepository[Session]):
                 sdk_session_id=sdk_session_id,
                 gmt_create=gmt_create,
                 gmt_modified=gmt_modified,
+                test=test,
             )
             logger.debug(f"create_session returned session with id={session.id}")
             return session
@@ -137,6 +142,7 @@ class ConversationSessionRepository(BaseRepository[Session]):
         sdk_session_id: Optional[str] = None,
         title: Optional[str] = None,
         directory: Optional[str] = None,
+        test: bool = False,
     ) -> Session:
         """Update an existing session.
 
@@ -145,12 +151,13 @@ class ConversationSessionRepository(BaseRepository[Session]):
             sdk_session_id: SDK session identifier to update (optional).
             title: Title to update (optional).
             directory: Directory to update (optional).
+            test: Filter by test flag (default: False).
 
         Returns:
             Updated Session instance.
         """
         try:
-            logger.debug(f"update_session called with session.id={session.id}, sdk_session_id={sdk_session_id}, title={title}, directory={directory}")
+            logger.debug(f"update_session called with session.id={session.id}, sdk_session_id={sdk_session_id}, title={title}, directory={directory}, test={test}")
             update_kwargs = {}
             if sdk_session_id is not None:
                 update_kwargs["sdk_session_id"] = sdk_session_id
@@ -174,6 +181,7 @@ class ConversationSessionRepository(BaseRepository[Session]):
         offset: int = 0,
         limit: int = 100,
         include_archived: bool = False,
+        test: bool = False,
     ) -> List[Session]:
         """Get all sessions for a specific project.
 
@@ -182,14 +190,16 @@ class ConversationSessionRepository(BaseRepository[Session]):
             offset: Offset for pagination (default: 0).
             limit: Maximum number of results (default: 100).
             include_archived: Whether to include archived sessions (default: False).
+            test: Filter by test flag (default: False).
 
         Returns:
             List of sessions for the project.
         """
         try:
-            logger.debug(f"get_by_project_unique_id called with project_unique_id={project_unique_id}, offset={offset}, limit={limit}, include_archived={include_archived}")
+            logger.debug(f"get_by_project_unique_id called with project_unique_id={project_unique_id}, offset={offset}, limit={limit}, include_archived={include_archived}, test={test}")
             query = select(Session).where(
-                Session.project_unique_id == project_unique_id
+                Session.project_unique_id == project_unique_id,
+                Session.test == test
             )
 
             if not include_archived:
@@ -210,6 +220,7 @@ class ConversationSessionRepository(BaseRepository[Session]):
         offset: int = 0,
         limit: int = 100,
         include_archived: bool = False,
+        test: bool = False,
     ) -> List[Session]:
         """Get all sessions for a specific workspace.
 
@@ -218,14 +229,16 @@ class ConversationSessionRepository(BaseRepository[Session]):
             offset: Offset for pagination (default: 0).
             limit: Maximum number of results (default: 100).
             include_archived: Whether to include archived sessions (default: False).
+            test: Filter by test flag (default: False).
 
         Returns:
             List of sessions for the workspace.
         """
         try:
-            logger.debug(f"get_by_workspace_unique_id called with workspace_unique_id={workspace_unique_id}, offset={offset}, limit={limit}, include_archived={include_archived}")
+            logger.debug(f"get_by_workspace_unique_id called with workspace_unique_id={workspace_unique_id}, offset={offset}, limit={limit}, include_archived={include_archived}, test={test}")
             query = select(Session).where(
-                Session.workspace_unique_id == workspace_unique_id
+                Session.workspace_unique_id == workspace_unique_id,
+                Session.test == test
             )
 
             if not include_archived:
@@ -248,6 +261,7 @@ class ConversationSessionRepository(BaseRepository[Session]):
         offset: int = 0,
         limit: int = 100,
         include_archived: bool = False,
+        test: bool = False,
     ) -> List[Session]:
         """Get sessions with optional filtering and pagination.
 
@@ -258,13 +272,14 @@ class ConversationSessionRepository(BaseRepository[Session]):
             offset: Offset for pagination (default: 0).
             limit: Maximum number of results (default: 100).
             include_archived: Whether to include archived sessions (default: False).
+            test: Filter by test flag (default: False).
 
         Returns:
             List of sessions matching the filters.
         """
         try:
-            logger.debug(f"list called with project_unique_id={project_unique_id}, workspace_unique_id={workspace_unique_id}, external_session_id={external_session_id}, offset={offset}, limit={limit}, include_archived={include_archived}")
-            query = select(Session)
+            logger.debug(f"list called with project_unique_id={project_unique_id}, workspace_unique_id={workspace_unique_id}, external_session_id={external_session_id}, offset={offset}, limit={limit}, include_archived={include_archived}, test={test}")
+            query = select(Session).where(Session.test == test)
 
             if project_unique_id is not None:
                 query = query.where(Session.project_unique_id == project_unique_id)
@@ -291,19 +306,21 @@ class ConversationSessionRepository(BaseRepository[Session]):
         self,
         session_unique_id: str,
         archived_time: Optional[int] = None,
+        test: bool = False,
     ) -> Optional[Session]:
         """Archive a session by setting its time_archived timestamp.
 
         Args:
             session_unique_id: The unique identifier of the session to archive.
             archived_time: Unix timestamp for archive time (default: current time).
+            test: Filter by test flag (default: False).
 
         Returns:
             Updated session if found, None otherwise.
         """
         try:
-            logger.debug(f"archive called with session_unique_id={session_unique_id}, archived_time={archived_time}")
-            session = await self.get_by_unique_id(session_unique_id)
+            logger.debug(f"archive called with session_unique_id={session_unique_id}, archived_time={archived_time}, test={test}")
+            session = await self.get_by_unique_id(session_unique_id, test=test)
             if session is None:
                 logger.debug(f"archive returned None (session not found)")
                 return None
@@ -322,18 +339,20 @@ class ConversationSessionRepository(BaseRepository[Session]):
     async def unarchive(
         self,
         session_unique_id: str,
+        test: bool = False,
     ) -> Optional[Session]:
         """Unarchive a session by clearing its time_archived timestamp.
 
         Args:
             session_unique_id: The unique identifier of the session to unarchive.
+            test: Filter by test flag (default: False).
 
         Returns:
             Updated session if found, None otherwise.
         """
         try:
-            logger.debug(f"unarchive called with session_unique_id={session_unique_id}")
-            session = await self.get_by_unique_id(session_unique_id)
+            logger.debug(f"unarchive called with session_unique_id={session_unique_id}, test={test}")
+            session = await self.get_by_unique_id(session_unique_id, test=test)
             if session is None:
                 logger.debug(f"unarchive returned None (session not found)")
                 return None
@@ -350,20 +369,23 @@ class ConversationSessionRepository(BaseRepository[Session]):
         self,
         project_unique_id: str,
         include_archived: bool = False,
+        test: bool = False,
     ) -> int:
         """Count sessions for a specific project.
 
         Args:
             project_unique_id: The unique identifier of the project.
             include_archived: Whether to include archived sessions (default: False).
+            test: Filter by test flag (default: False).
 
         Returns:
             Number of sessions for the project.
         """
         try:
-            logger.debug(f"count_by_project called with project_unique_id={project_unique_id}, include_archived={include_archived}")
+            logger.debug(f"count_by_project called with project_unique_id={project_unique_id}, include_archived={include_archived}, test={test}")
             query = select(Session).where(
-                Session.project_unique_id == project_unique_id
+                Session.project_unique_id == project_unique_id,
+                Session.test == test
             )
 
             if not include_archived:
@@ -381,20 +403,23 @@ class ConversationSessionRepository(BaseRepository[Session]):
         self,
         workspace_unique_id: str,
         include_archived: bool = False,
+        test: bool = False,
     ) -> int:
         """Count sessions for a specific workspace.
 
         Args:
             workspace_unique_id: The unique identifier of the workspace.
             include_archived: Whether to include archived sessions (default: False).
+            test: Filter by test flag (default: False).
 
         Returns:
             Number of sessions for the workspace.
         """
         try:
-            logger.debug(f"count_by_workspace called with workspace_unique_id={workspace_unique_id}, include_archived={include_archived}")
+            logger.debug(f"count_by_workspace called with workspace_unique_id={workspace_unique_id}, include_archived={include_archived}, test={test}")
             query = select(Session).where(
-                Session.workspace_unique_id == workspace_unique_id
+                Session.workspace_unique_id == workspace_unique_id,
+                Session.test == test
             )
 
             if not include_archived:

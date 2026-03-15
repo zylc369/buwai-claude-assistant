@@ -1,15 +1,27 @@
 """Pytest configuration and fixtures for repository tests."""
 
+import os
+import shutil
 import pytest
 import pytest_asyncio
 from pathlib import Path
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 
 from database.models import Base
+from config import get_config
 
 
-# Use in-memory SQLite for testing
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+PROJECTS_ROOT = get_config().projects.root
+
+
+@pytest.fixture(scope="session", autouse=True)
+def cleanup_projects_root():
+    if os.path.exists(PROJECTS_ROOT):
+        shutil.rmtree(PROJECTS_ROOT)
+    yield
+    if os.path.exists(PROJECTS_ROOT):
+        shutil.rmtree(PROJECTS_ROOT)
 
 
 @pytest_asyncio.fixture
