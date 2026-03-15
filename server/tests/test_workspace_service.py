@@ -1,11 +1,17 @@
 """Tests for WorkspaceService."""
 
+import os
+import shutil
 import pytest
 import pytest_asyncio
+from pathlib import Path
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 
+from config import get_config
 from database.models import Base, Project, Workspace, Session
 from services.workspace_service import WorkspaceService
+
+PROJECTS_ROOT = get_config().projects.root
 
 
 @pytest_asyncio.fixture
@@ -28,9 +34,12 @@ async def db_session():
 @pytest_asyncio.fixture
 async def sample_project(db_session: AsyncSession):
     """Create a sample project for testing."""
+    project_dir = Path(PROJECTS_ROOT) / "worktree"
+    project_dir.mkdir(parents=True, exist_ok=True)
+    
     project = Project(
         project_unique_id="proj-001",
-        directory="/path/to/worktree",
+        directory="worktree",
         branch="main",
         name="Test Project",
         gmt_create=1000000,
@@ -44,9 +53,12 @@ async def sample_project(db_session: AsyncSession):
 @pytest_asyncio.fixture
 async def sample_project2(db_session: AsyncSession):
     """Create a second sample project for testing."""
+    project_dir = Path(PROJECTS_ROOT) / "worktree2"
+    project_dir.mkdir(parents=True, exist_ok=True)
+    
     project = Project(
         project_unique_id="proj-002",
-        directory="/path/to/worktree2",
+        directory="worktree2",
         branch="develop",
         name="Another Project",
         gmt_create=1000000,
@@ -70,7 +82,7 @@ class TestWorkspaceServiceCreate:
         workspace = await service.create_workspace(
             workspace_unique_id="ws-001",
             project_unique_id="proj-001",
-            directory="/test/workspace"
+            directory="test-workspace"
         )
 
         assert workspace.id is not None
@@ -88,7 +100,7 @@ class TestWorkspaceServiceCreate:
             workspace_unique_id="ws-001",
             project_unique_id="proj-001",
             branch="feature/test",
-            directory="/path/to/workspace",
+            directory="workspace",
             extra='{"key": "value"}'
         )
 
@@ -112,7 +124,7 @@ class TestWorkspaceServiceGetById:
         created = await service.create_workspace(
             workspace_unique_id="ws-001",
             project_unique_id="proj-001",
-            directory="/test/workspace"
+            directory="test-workspace"
         )
 
         found = await service.get_workspace_by_id(created.id)
@@ -177,7 +189,7 @@ class TestWorkspaceServiceList:
         await service.create_workspace(
             workspace_unique_id="ws-001",
             project_unique_id="proj-001",
-            directory="/test/workspace1"
+            directory="test-workspace1"
         )
         await service.create_workspace(
             workspace_unique_id="ws-002",
@@ -213,7 +225,7 @@ class TestWorkspaceServiceList:
         await service.create_workspace(
             workspace_unique_id="ws-001",
             project_unique_id="proj-001",
-            directory="/test/workspace1"
+            directory="test-workspace1"
         )
         await service.create_workspace(
             workspace_unique_id="ws-002",
@@ -296,7 +308,7 @@ class TestWorkspaceServiceDelete:
         created = await service.create_workspace(
             workspace_unique_id="ws-001",
             project_unique_id="proj-001",
-            directory="/test/workspace"
+            directory="test-workspace"
         )
 
         result = await service.delete_workspace(created.id)

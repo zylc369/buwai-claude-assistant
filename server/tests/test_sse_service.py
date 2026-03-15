@@ -304,44 +304,43 @@ class TestSSEServiceWithDatabase:
     @pytest_asyncio.fixture
     async def setup_session_data(self, db_session: AsyncSession):
         from database.models import Project, Workspace, Session
-        import time
-        
+        from utils.timestamp import get_timestamp_ms
+
         project = Project(
             project_unique_id="proj_sse_001",
-            directory="/test/path",
+            directory="test-path",
             branch="main",
             name="Test Project",
-            gmt_create=int(time.time()),
-            gmt_modified=int(time.time())
+            gmt_create=get_timestamp_ms(),
+            gmt_modified=get_timestamp_ms()
         )
         db_session.add(project)
         await db_session.flush()
-        
+
         workspace = Workspace(
             workspace_unique_id="ws_sse_001",
             branch="main",
-            name="Test Workspace",
-            directory="/test/path",
+            directory="test-path",
             project_unique_id="proj_sse_001",
-            gmt_create=int(time.time()),
-            gmt_modified=int(time.time())
+            gmt_create=get_timestamp_ms(),
+            gmt_modified=get_timestamp_ms()
         )
         db_session.add(workspace)
         await db_session.flush()
-        
+
         session = Session(
             session_unique_id="sess_sse_001",
             external_session_id="external-sess-sse-001",
             project_unique_id="proj_sse_001",
             workspace_unique_id="ws_sse_001",
-            directory="/test/path",
+            directory="test-path",
             title="Test Session",
-            gmt_create=int(time.time()),
-            gmt_modified=int(time.time())
+            gmt_create=get_timestamp_ms(),
+            gmt_modified=get_timestamp_ms()
         )
         db_session.add(session)
         await db_session.flush()
-        
+
         return {
             "project": project,
             "workspace": workspace,

@@ -46,7 +46,7 @@ async def sample_project(db_session: AsyncSession):
     """Create a sample project for testing."""
     project = Project(
         project_unique_id="proj-001",
-        directory="/path/to/worktree",
+        directory="worktree",
         branch="main",
         name="Test Project",
         gmt_create=1000000,
@@ -63,7 +63,7 @@ async def sample_project2(db_session: AsyncSession):
     """Create a second sample project for testing."""
     project = Project(
         project_unique_id="proj-002",
-        directory="/path/to/worktree2",
+        directory="worktree2",
         branch="develop",
         name="Another Project",
         gmt_create=1000000,
@@ -232,7 +232,7 @@ class TestWorkspaceRepositoryCRUD:
         workspace = create_test_workspace(
             workspace_unique_id="ws-001",
             project_unique_id="proj-001",
-            directory="/test/workspace",
+            directory="test-workspace",
             branch="main"
         )
         db_session.add(workspace)
@@ -252,7 +252,7 @@ class TestWorkspaceRepositoryCRUD:
         workspace = create_test_workspace(
             workspace_unique_id="ws-001",
             project_unique_id="proj-001",
-            directory="/test/workspace",
+            directory="test-workspace",
             branch="main"
         )
         db_session.add(workspace)
@@ -302,7 +302,7 @@ class TestWorkspaceRepositoryExists:
         workspace = create_test_workspace(
             workspace_unique_id="ws-001",
             project_unique_id="proj-001",
-            directory="/test/workspace",
+            directory="test-workspace",
             branch="main"
         )
         db_session.add(workspace)

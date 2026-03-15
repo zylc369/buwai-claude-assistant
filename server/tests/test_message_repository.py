@@ -3,11 +3,11 @@
 import json
 import pytest
 import pytest_asyncio
-import time
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.models import Project, Workspace, Session, Message
 from repositories.message_repository import MessageRepository
+from utils.timestamp import get_timestamp_ms
 
 
 @pytest_asyncio.fixture
@@ -16,11 +16,11 @@ async def setup_test_data(db_session: AsyncSession):
     # Create project
     project = Project(
         project_unique_id="proj_001",
-        directory="/test/path",
+        directory="test-path",
         branch="main",
         name="Test Project",
-        gmt_create=int(time.time()),
-        gmt_modified=int(time.time())
+        gmt_create=get_timestamp_ms(),
+        gmt_modified=get_timestamp_ms()
     )
     db_session.add(project)
     await db_session.flush()
@@ -29,11 +29,10 @@ async def setup_test_data(db_session: AsyncSession):
     workspace = Workspace(
         workspace_unique_id="ws_001",
         branch="main",
-        name="Test Workspace",
-        directory="/test/path",
+        directory="test-path",
         project_unique_id="proj_001",
-        gmt_create=int(time.time()),
-        gmt_modified=int(time.time())
+        gmt_create=get_timestamp_ms(),
+        gmt_modified=get_timestamp_ms()
     )
     db_session.add(workspace)
     await db_session.flush()
@@ -44,10 +43,10 @@ async def setup_test_data(db_session: AsyncSession):
         external_session_id="external-sess-001",
         project_unique_id="proj_001",
         workspace_unique_id="ws_001",
-        directory="/test/path",
+        directory="test-path",
         title="Test Session",
-        gmt_create=int(time.time()),
-        gmt_modified=int(time.time())
+        gmt_create=get_timestamp_ms(),
+        gmt_modified=get_timestamp_ms()
     )
     db_session.add(session)
     await db_session.flush()
@@ -70,7 +69,7 @@ async def test_create_message(db_session: AsyncSession, setup_test_data):
         "metadata": {"key": "value"}
     }
     
-    current_time = int(time.time())
+    current_time = get_timestamp_ms()
     message = await repo.create(
         message_unique_id="msg_001",
         session_unique_id="sess_001",
@@ -110,7 +109,7 @@ async def test_create_message_with_complex_data(db_session: AsyncSession, setup_
         }
     }
     
-    current_time = int(time.time())
+    current_time = get_timestamp_ms()
     message = await repo.create(
         message_unique_id="msg_002",
         session_unique_id="sess_001",
@@ -132,7 +131,7 @@ async def test_get_by_unique_id_exists(db_session: AsyncSession, setup_test_data
     repo = MessageRepository(db_session)
     
     # Create a message first
-    current_time = int(time.time())
+    current_time = get_timestamp_ms()
     await repo.create(
         message_unique_id="msg_003",
         session_unique_id="sess_001",
@@ -165,7 +164,7 @@ async def test_get_by_session_unique_id(db_session: AsyncSession, setup_test_dat
     repo = MessageRepository(db_session)
     
     # Create multiple messages
-    current_time = int(time.time())
+    current_time = get_timestamp_ms()
     for i in range(5):
         await repo.create(
             message_unique_id=f"msg_{i+10}",
@@ -191,7 +190,7 @@ async def test_get_by_session_unique_id_with_pagination(db_session: AsyncSession
     repo = MessageRepository(db_session)
     
     # Create 10 messages
-    current_time = int(time.time())
+    current_time = get_timestamp_ms()
     for i in range(10):
         await repo.create(
             message_unique_id=f"msg_page_{i}",
@@ -221,10 +220,10 @@ async def test_get_by_session_unique_id_empty(db_session: AsyncSession, setup_te
         external_session_id="external-sess-002",
         project_unique_id="proj_001",
         workspace_unique_id="ws_001",
-        directory="/test/path",
+        directory="test-path",
         title="Empty Session",
-        gmt_create=int(time.time()),
-        gmt_modified=int(time.time())
+        gmt_create=get_timestamp_ms(),
+        gmt_modified=get_timestamp_ms()
     )
     db_session.add(new_session)
     await db_session.flush()
@@ -241,7 +240,7 @@ async def test_list_method(db_session: AsyncSession, setup_test_data):
     repo = MessageRepository(db_session)
     
     # Create messages
-    current_time = int(time.time())
+    current_time = get_timestamp_ms()
     for i in range(3):
         await repo.create(
             message_unique_id=f"msg_list_{i}",
@@ -263,7 +262,7 @@ async def test_count_by_session(db_session: AsyncSession, setup_test_data):
     repo = MessageRepository(db_session)
     
     # Create messages
-    current_time = int(time.time())
+    current_time = get_timestamp_ms()
     for i in range(7):
         await repo.create(
             message_unique_id=f"msg_count_{i}",
@@ -290,10 +289,10 @@ async def test_count_by_session_empty(db_session: AsyncSession, setup_test_data)
         external_session_id="external-sess-count-empty",
         project_unique_id="proj_001",
         workspace_unique_id="ws_001",
-        directory="/test/path",
+        directory="test-path",
         title="Count Empty Session",
-        gmt_create=int(time.time()),
-        gmt_modified=int(time.time())
+        gmt_create=get_timestamp_ms(),
+        gmt_modified=get_timestamp_ms()
     )
     db_session.add(new_session)
     await db_session.flush()
@@ -320,7 +319,7 @@ async def test_data_field_json_serialization(db_session: AsyncSession, setup_tes
         "nested": {"a": {"b": {"c": "deep"}}}
     }
     
-    current_time = int(time.time())
+    current_time = get_timestamp_ms()
     message = await repo.create(
         message_unique_id="msg_json_test",
         session_unique_id="sess_001",
@@ -348,7 +347,7 @@ async def test_update_message(db_session: AsyncSession, setup_test_data):
     repo = MessageRepository(db_session)
     
     # Create message
-    current_time = int(time.time())
+    current_time = get_timestamp_ms()
     message = await repo.create(
         message_unique_id="msg_update_test",
         session_unique_id="sess_001",
@@ -376,7 +375,7 @@ async def test_delete_message(db_session: AsyncSession, setup_test_data):
     repo = MessageRepository(db_session)
     
     # Create message
-    current_time = int(time.time())
+    current_time = get_timestamp_ms()
     message = await repo.create(
         message_unique_id="msg_delete_test",
         session_unique_id="sess_001",

@@ -1,11 +1,11 @@
 """Tests for ProjectRepository."""
 
 import pytest
-import time
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.models import Project, Workspace, Session, Message
 from repositories.project_repository import ProjectRepository
+from utils.timestamp import get_timestamp_ms
 
 
 # Helper function to create test projects
@@ -17,7 +17,7 @@ async def create_test_project(
     branch: str | None = None,
 ) -> Project:
     """Create a test project."""
-    current_time = int(time.time())
+    current_time = get_timestamp_ms()
     return await repo.create(
         project_unique_id=project_unique_id,
         directory=directory,
@@ -373,7 +373,7 @@ class TestProjectRepositoryUpdate:
         )
         await db_session.commit()
         
-        new_time = int(time.time()) + 1000
+        new_time = get_timestamp_ms() + 1000
         updated = await repo.update(
             project,
             directory="new_dir",
@@ -427,7 +427,7 @@ class TestProjectRepositoryDelete:
         await db_session.flush()
 
         # Create workspace for the project
-        current_time = int(time.time())
+        current_time = get_timestamp_ms()
         workspace = Workspace(
             workspace_unique_id="ws-001",
             project_unique_id="proj-cascade-001",
@@ -464,7 +464,7 @@ class TestProjectRepositoryDelete:
         await db_session.flush()
 
         # Create workspace
-        current_time = int(time.time())
+        current_time = get_timestamp_ms()
         workspace = Workspace(
             workspace_unique_id="ws-001",
             project_unique_id="proj-cascade-002",
@@ -481,7 +481,7 @@ class TestProjectRepositoryDelete:
             external_session_id="external-sess-001",
             project_unique_id="proj-cascade-002",
             workspace_unique_id="ws-002",
-            directory="/test/dir",
+            directory="test-dir",
             title="Test Session",
             gmt_create=current_time,
             gmt_modified=current_time,
@@ -515,7 +515,7 @@ class TestProjectRepositoryDelete:
         await db_session.flush()
 
         # Create workspace
-        current_time = int(time.time())
+        current_time = get_timestamp_ms()
         workspace = Workspace(
             workspace_unique_id="ws-001",
             project_unique_id="proj-cascade-003",
@@ -532,7 +532,7 @@ class TestProjectRepositoryDelete:
             external_session_id="external-sess-002",
             project_unique_id="proj-cascade-003",
             workspace_unique_id="ws-003",
-            directory="/test/dir",
+            directory="test-dir",
             title="Test Session",
             gmt_create=current_time,
             gmt_modified=current_time,

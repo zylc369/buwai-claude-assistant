@@ -1,6 +1,5 @@
 """Conversation Session repository for database operations."""
 
-import time
 from typing import List, Optional
 
 from sqlalchemy import select
@@ -8,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.models import Session
 from repositories.base import BaseRepository
+from utils.timestamp import get_timestamp_ms
 from logger import get_logger
 
 logger = get_logger(__name__)
@@ -108,7 +108,7 @@ class ConversationSessionRepository(BaseRepository[Session]):
         try:
             logger.debug(f"create_session called with session_unique_id={session_unique_id}, project_unique_id={project_unique_id}, workspace_unique_id={workspace_unique_id}")
             if gmt_create is None or gmt_modified is None:
-                current_time = int(time.time())
+                current_time = get_timestamp_ms()
                 if gmt_create is None:
                     gmt_create = current_time
                 if gmt_modified is None:
@@ -309,7 +309,7 @@ class ConversationSessionRepository(BaseRepository[Session]):
                 return None
 
             if archived_time is None:
-                archived_time = int(time.time())
+                archived_time = get_timestamp_ms()
 
             session.time_archived = archived_time
             await self.session.flush()

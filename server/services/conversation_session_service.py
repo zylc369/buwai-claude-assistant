@@ -1,6 +1,5 @@
 """Conversation Session service for business logic."""
 
-import time
 from typing import List, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,6 +9,7 @@ from database.models import Session
 from repositories.conversation_session_repository import ConversationSessionRepository
 from services.project_service import ProjectService
 from services.workspace_service import WorkspaceService
+from utils.timestamp import get_timestamp_ms
 from logger import get_logger
 
 logger = get_logger(__name__)
@@ -74,7 +74,7 @@ class ConversationSessionService:
             Created Session instance.
         """
         logger.debug(f"create_session called with session_unique_id={session_unique_id}")
-        current_time = int(time.time())
+        current_time = get_timestamp_ms()
 
         # Compute directory from project/workspace if not provided
         if directory is None:
@@ -219,7 +219,7 @@ class ConversationSessionService:
             return None
 
         # Auto-update gmt_modified
-        kwargs["gmt_modified"] = int(time.time())
+        kwargs["gmt_modified"] = get_timestamp_ms()
 
         logger.info(f"Business decision: updating session {session_unique_id}")
         updated = await self.session_repo.update(session, **kwargs)

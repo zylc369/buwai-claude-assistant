@@ -353,7 +353,7 @@ class TestProjectServiceDelete:
         workspace = Workspace(
             workspace_unique_id="ws-cascade-001",
             project_unique_id="proj-cascade-001",
-            directory="/test/dir",
+            directory="test-dir",
             gmt_create=current_time,
             gmt_modified=current_time,
         )
@@ -383,7 +383,7 @@ class TestProjectServiceDelete:
         workspace = Workspace(
             workspace_unique_id="ws-cascade-002",
             project_unique_id="proj-cascade-002",
-            directory="/test/dir",
+            directory="test-dir",
             gmt_create=current_time,
             gmt_modified=current_time,
         )
@@ -395,7 +395,7 @@ class TestProjectServiceDelete:
             external_session_id="external-sess-cascade-001",
             project_unique_id="proj-cascade-002",
             workspace_unique_id="ws-cascade-002",
-            directory="/test/dir",
+            directory="test-dir",
             title="Test Session",
             gmt_create=current_time,
             gmt_modified=current_time,
@@ -426,7 +426,7 @@ class TestProjectServiceDelete:
         workspace = Workspace(
             workspace_unique_id="ws-cascade-003",
             project_unique_id="proj-cascade-003",
-            directory="/test/dir",
+            directory="test-dir",
             gmt_create=current_time,
             gmt_modified=current_time,
         )
@@ -438,7 +438,7 @@ class TestProjectServiceDelete:
             external_session_id="external-sess-cascade-002",
             project_unique_id="proj-cascade-003",
             workspace_unique_id="ws-cascade-003",
-            directory="/test/dir",
+            directory="test-dir",
             title="Test Session",
             gmt_create=current_time,
             gmt_modified=current_time,

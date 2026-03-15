@@ -1,7 +1,6 @@
 """Project service for business logic."""
 
 import os
-import time
 from pathlib import Path
 from typing import List, Optional
 
@@ -11,6 +10,7 @@ from config import get_config
 from database.models import DIRECTORY_PATTERN, Project
 from repositories.project_repository import ProjectRepository
 from utils.id_generator import generate_uuidv7
+from utils.timestamp import get_timestamp_ms
 from logger import get_logger
 
 logger = get_logger(__name__)
@@ -98,7 +98,7 @@ class ProjectService:
         if project_unique_id is None:
             project_unique_id = generate_uuidv7()
 
-        current_time = int(time.time())
+        current_time = get_timestamp_ms()
 
         try:
             logger.info(f"Business decision: creating project {project_unique_id}")
@@ -169,7 +169,7 @@ class ProjectService:
         if "directory" in kwargs:
             self._validate_directory(kwargs["directory"])
 
-        kwargs["gmt_modified"] = int(time.time())
+        kwargs["gmt_modified"] = get_timestamp_ms()
 
         logger.info(f"Business decision: updating project {project_id}")
         updated = await self.project_repo.update(project, **kwargs)
@@ -188,8 +188,8 @@ class ProjectService:
 
         updated = await self.project_repo.update(
             project,
-            latest_active_time=int(time.time()),
-            gmt_modified=int(time.time()),
+            latest_active_time=get_timestamp_ms(),
+            gmt_modified=get_timestamp_ms(),
         )
         await self.session.commit()
         await self.session.refresh(updated)

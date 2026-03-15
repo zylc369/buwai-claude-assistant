@@ -1,11 +1,11 @@
 """Tests for ConversationSessionRepository."""
 
 import pytest
-import time
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.models import Project, Workspace, Session
 from repositories.conversation_session_repository import ConversationSessionRepository
+from utils.timestamp import get_timestamp_ms
 
 
 # Helper function to create test project and workspace
@@ -15,13 +15,12 @@ async def create_test_project_and_workspace(
     workspace_unique_id: str,
 ) -> tuple[Project, Workspace]:
     """Create a test project and workspace for sessions."""
-    current_time = int(time.time())
+    current_time = get_timestamp_ms()
     
     project = Project(
         project_unique_id=project_unique_id,
-        directory="/path/to/worktree",
+        directory="worktree",
         name=f"Project {project_unique_id}",
-        time_initialized=current_time,
         gmt_create=current_time,
         gmt_modified=current_time,
     )
@@ -31,8 +30,7 @@ async def create_test_project_and_workspace(
     workspace = Workspace(
         workspace_unique_id=workspace_unique_id,
         project_unique_id=project_unique_id,
-        name=f"Workspace {workspace_unique_id}",
-        directory="/test/dir",
+        directory="test-dir",
         gmt_create=current_time,
         gmt_modified=current_time,
     )
@@ -53,7 +51,7 @@ async def create_test_session(
     time_archived: int = None,
 ) -> Session:
     """Create a test session."""
-    current_time = int(time.time())
+    current_time = get_timestamp_ms()
     return await repo.create(
         session_unique_id=session_unique_id,
         external_session_id=f"external-{session_unique_id}",
@@ -106,7 +104,7 @@ class TestConversationSessionRepositoryCreate:
         )
         repo = ConversationSessionRepository(db_session)
         
-        archived_time = int(time.time())
+        archived_time = get_timestamp_ms()
         session = await create_test_session(
             repo,
             session_unique_id="sess-002",
@@ -277,7 +275,7 @@ class TestConversationSessionRepositoryGetByProjectUniqueId:
             )
         
         # Create archived sessions
-        archived_time = int(time.time())
+        archived_time = get_timestamp_ms()
         for i in range(2):
             await create_test_session(
                 repo,
@@ -392,7 +390,7 @@ class TestConversationSessionRepositoryGetByWorkspaceUniqueId:
             )
         
         # Create archived sessions
-        archived_time = int(time.time())
+        archived_time = get_timestamp_ms()
         for i in range(2):
             await create_test_session(
                 repo,
@@ -539,12 +537,11 @@ class TestConversationSessionRepositoryList:
             workspace_unique_id="ws-ws-filter-001",
         )
         # Create another workspace for the same project
-        current_time = int(time.time())
+        current_time = get_timestamp_ms()
         workspace2 = Workspace(
             workspace_unique_id="ws-ws-filter-002",
             project_unique_id="proj-ws-filter",
-            name="Workspace 2",
-            directory="/test/dir2",
+            directory="test-dir2",
             gmt_create=current_time,
             gmt_modified=current_time,
         )
@@ -600,7 +597,7 @@ class TestConversationSessionRepositoryList:
             )
         
         # Create archived sessions
-        archived_time = int(time.time())
+        archived_time = get_timestamp_ms()
         for i in range(2):
             await create_test_session(
                 repo,
@@ -698,7 +695,7 @@ class TestConversationSessionRepositoryUnarchive:
         )
         repo = ConversationSessionRepository(db_session)
         
-        archived_time = int(time.time())
+        archived_time = get_timestamp_ms()
         session = await create_test_session(
             repo,
             session_unique_id="sess-unarchive",
@@ -774,7 +771,7 @@ class TestConversationSessionRepositoryCountByProject:
             )
         
         # Create archived sessions
-        archived_time = int(time.time())
+        archived_time = get_timestamp_ms()
         for i in range(2):
             await create_test_session(
                 repo,
@@ -854,7 +851,7 @@ class TestConversationSessionRepositoryCountByWorkspace:
             )
         
         # Create archived sessions
-        archived_time = int(time.time())
+        archived_time = get_timestamp_ms()
         for i in range(2):
             await create_test_session(
                 repo,
@@ -918,21 +915,21 @@ class TestConversationSessionRepositoryUpdate:
             project_unique_id="proj-update-multi",
             workspace_unique_id="ws-update-multi",
             title="Original",
-            directory="/original/path",
+            directory="original-path",
         )
         await db_session.commit()
         
-        new_time = int(time.time()) + 1000
+        new_time = get_timestamp_ms() + 1000
         updated = await repo.update(
             session,
             title="Updated",
-            directory="/new/path",
+            directory="new-path",
             gmt_modified=new_time,
         )
         await db_session.commit()
         
         assert updated.title == "Updated"
-        assert updated.directory == "/new/path"
+        assert updated.directory == "new-path"
         assert updated.gmt_modified == new_time
 
 
@@ -1049,13 +1046,13 @@ class TestConversationSessionRepositoryCreateWithSdkSessionId:
         )
         repo = ConversationSessionRepository(db_session)
         
-        current_time = int(time.time())
+        current_time = get_timestamp_ms()
         session = await repo.create_session(
             session_unique_id="sess-sdk-001",
             external_session_id="external-sess-sdk-001",
             project_unique_id="proj-sdk-001",
             workspace_unique_id="ws-sdk-001",
-            directory="/test/sdk/dir",
+            directory="test-sdk-dir",
             title="SDK Session",
             sdk_session_id="sdk-session-12345",
             gmt_create=current_time,

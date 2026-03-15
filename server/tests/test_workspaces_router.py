@@ -83,7 +83,7 @@ async def client(app):
 async def test_project(test_session: AsyncSession):
     project = Project(
         project_unique_id="proj-router-001",
-        directory="/path/to/worktree",
+        directory="worktree",
         branch="main",
         name="Router Test Project",
         gmt_create=1000000,
@@ -99,7 +99,7 @@ async def test_project(test_session: AsyncSession):
 async def test_project2(test_session: AsyncSession):
     project = Project(
         project_unique_id="proj-router-002",
-        directory="/path/to/worktree2",
+        directory="worktree2",
         branch="develop",
         name="Router Test Project 2",
         gmt_create=1000000,
@@ -117,7 +117,7 @@ async def test_workspace(test_session: AsyncSession, test_project: Project):
         workspace_unique_id="ws-router-001",
         project_unique_id=test_project.project_unique_id,
         branch="feature/test",
-        directory="/path/to/workspace",
+        directory="workspace",
         gmt_create=1000,
         gmt_modified=1000,
     )

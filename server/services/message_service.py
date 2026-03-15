@@ -1,6 +1,5 @@
 """Message service for business logic with AI integration."""
 
-import time
 import json
 from typing import List, Optional, Dict, Any, AsyncIterator
 
@@ -13,6 +12,7 @@ from repositories.workspace_repository import WorkspaceRepository
 from claude_client import ClaudeClient, ClaudeClientConfig
 from pool import ClaudeClientPool
 from utils.id_generator import generate_uuidv7
+from utils.timestamp import get_timestamp_ms
 from logger import get_logger
 
 logger = get_logger(__name__)
@@ -59,7 +59,7 @@ class MessageService:
             Created message instance.
         """
         logger.debug(f"create_message called with message_unique_id={message_unique_id}, session_unique_id={session_unique_id}")
-        current_time = int(time.time())
+        current_time = get_timestamp_ms()
         
         message = await self.message_repo.create(
             message_unique_id=message_unique_id,
@@ -218,7 +218,7 @@ class MessageService:
         """
         logger.debug(f"send_ai_prompt called with session_unique_id={session_unique_id}")
         logger.info(f"AI operation: sending prompt of length {len(prompt)} characters")
-        current_time = int(time.time())
+        current_time = get_timestamp_ms()
 
         user_msg_id = f"user-{generate_uuidv7()}"
         logger.info(f"Business decision: creating user message {user_msg_id}")
@@ -341,7 +341,7 @@ class MessageService:
         if data is not None:
             update_data["data"] = json.dumps(data, ensure_ascii=False)
         if "gmt_modified" not in update_data:
-            update_data["gmt_modified"] = int(time.time())
+            update_data["gmt_modified"] = get_timestamp_ms()
 
         logger.info(f"Business decision: updating message {message_unique_id}")
         updated = await self.message_repo.update(message, **update_data)

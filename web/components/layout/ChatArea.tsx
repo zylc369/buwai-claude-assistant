@@ -132,7 +132,7 @@ export function ChatArea({ messages, isLoading, streamingContent, sdkSessionId }
                         : "text-muted-foreground"
                     )}
                   >
-                    {formatDateTime(message.gmt_create * 1000)}
+                    {formatDateTime(message.gmt_create)}
                   </p>
                 </div>
               </div>

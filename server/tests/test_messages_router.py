@@ -3,7 +3,6 @@
 import json
 import pytest
 import pytest_asyncio
-import time
 from typing import AsyncGenerator
 from unittest.mock import AsyncMock, patch
 from httpx import AsyncClient, ASGITransport
@@ -15,6 +14,7 @@ from database import get_db_session
 import importlib.util
 import sys
 from pathlib import Path
+from utils.timestamp import get_timestamp_ms
 
 spec = importlib.util.spec_from_file_location(
     "messages_router",
@@ -89,11 +89,11 @@ async def client(app):
 
 @pytest_asyncio.fixture
 async def setup_test_data(db_session: AsyncSession):
-    current_time = int(time.time())
+    current_time = get_timestamp_ms()
     
     project = Project(
         project_unique_id="proj_msg_001",
-        directory="/test/path",
+        directory="test-path",
         branch="main",
         name="Test Project",
         gmt_create=current_time,
@@ -105,8 +105,7 @@ async def setup_test_data(db_session: AsyncSession):
     workspace = Workspace(
         workspace_unique_id="ws_msg_001",
         branch="main",
-        name="Test Workspace",
-        directory="/test/path",
+        directory="test-path",
         project_unique_id="proj_msg_001",
         gmt_create=current_time,
         gmt_modified=current_time
@@ -119,7 +118,7 @@ async def setup_test_data(db_session: AsyncSession):
         external_session_id="external-sess-msg-001",
         project_unique_id="proj_msg_001",
         workspace_unique_id="ws_msg_001",
-        directory="/test/path",
+        directory="test-path",
         title="Test Session",
         gmt_create=current_time,
         gmt_modified=current_time
@@ -136,7 +135,7 @@ async def setup_test_data(db_session: AsyncSession):
 
 @pytest_asyncio.fixture
 async def test_message(db_session: AsyncSession, setup_test_data):
-    current_time = int(time.time())
+    current_time = get_timestamp_ms()
     
     message = Message(
         message_unique_id="msg_test_001",
@@ -168,14 +167,14 @@ class TestListMessages:
     
     @pytest.mark.asyncio
     async def test_list_messages_empty(self, client: AsyncClient, db_session: AsyncSession, setup_test_data):
-        current_time = int(time.time())
+        current_time = get_timestamp_ms()
         
         new_session = Session(
             session_unique_id="sess_empty_msg",
             external_session_id="external-sess-empty-msg",
             project_unique_id="proj_msg_001",
             workspace_unique_id="ws_msg_001",
-            directory="/test/path",
+            directory="test-path",
             title="Empty Session",
             gmt_create=current_time,
             gmt_modified=current_time
@@ -200,7 +199,7 @@ class TestListMessages:
         db_session: AsyncSession,
         setup_test_data
     ):
-        current_time = int(time.time())
+        current_time = get_timestamp_ms()
         
         for i in range(5):
             msg = Message(

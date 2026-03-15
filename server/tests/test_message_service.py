@@ -3,24 +3,24 @@
 import json
 import pytest
 import pytest_asyncio
-import time
 from unittest.mock import AsyncMock, MagicMock, patch
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.models import Project, Workspace, Session, Message
 from services.message_service import MessageService
 from claude_client import ClaudeClientConfig
+from utils.timestamp import get_timestamp_ms
 
 
 @pytest_asyncio.fixture
 async def setup_test_data(db_session: AsyncSession):
     project = Project(
         project_unique_id="proj_svc_001",
-        directory="/test/path",
+        directory="test-path",
         branch="main",
         name="Test Project",
-        gmt_create=int(time.time()),
-        gmt_modified=int(time.time())
+        gmt_create=get_timestamp_ms(),
+        gmt_modified=get_timestamp_ms()
     )
     db_session.add(project)
     await db_session.flush()
@@ -28,11 +28,10 @@ async def setup_test_data(db_session: AsyncSession):
     workspace = Workspace(
         workspace_unique_id="ws_svc_001",
         branch="main",
-        name="Test Workspace",
-        directory="/test/path",
+        directory="test-path",
         project_unique_id="proj_svc_001",
-        gmt_create=int(time.time()),
-        gmt_modified=int(time.time())
+        gmt_create=get_timestamp_ms(),
+        gmt_modified=get_timestamp_ms()
     )
     db_session.add(workspace)
     await db_session.flush()
@@ -42,10 +41,10 @@ async def setup_test_data(db_session: AsyncSession):
         external_session_id="external-sess-svc-001",
         project_unique_id="proj_svc_001",
         workspace_unique_id="ws_svc_001",
-        directory="/test/path",
+        directory="test-path",
         title="Test Session",
-        gmt_create=int(time.time()),
-        gmt_modified=int(time.time())
+        gmt_create=get_timestamp_ms(),
+        gmt_modified=get_timestamp_ms()
     )
     db_session.add(session)
     await db_session.flush()
@@ -205,10 +204,10 @@ async def test_list_messages_empty_session(db_session: AsyncSession, setup_test_
         external_session_id="external-sess-empty",
         project_unique_id="proj_svc_001",
         workspace_unique_id="ws_svc_001",
-        directory="/test/path",
+        directory="test-path",
         title="Empty Session",
-        gmt_create=int(time.time()),
-        gmt_modified=int(time.time())
+        gmt_create=get_timestamp_ms(),
+        gmt_modified=get_timestamp_ms()
     )
     db_session.add(new_session)
     await db_session.flush()
