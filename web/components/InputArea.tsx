@@ -2,23 +2,25 @@
 
 import { useState, useRef, useCallback, KeyboardEvent, useEffect } from "react";
 import { useSessionStore } from "@/lib/stores/useSessionStore";
+import { useWorkspaceStore } from "@/lib/stores/useWorkspaceStore";
 import { apiClient } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
 import { Send, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import type { SendAIRequest } from "@/lib/api/types";
 
 interface InputAreaProps {
   onStreamingContent?: (content: string) => void;
   onStreamEnd?: () => void;
-  onSdkSessionId?: (sdkSessionId: string) => void;
 }
 
-export function InputArea({ onStreamingContent, onStreamEnd, onSdkSessionId }: InputAreaProps) {
+export function InputArea({ onStreamingContent, onStreamEnd }: InputAreaProps) {
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const { selectedSession } = useSessionStore();
+  const { selectedSession, isNewSession, markSessionPersisted } = useSessionStore();
+  const { selectedWorkspace } = useWorkspaceStore();
 
   useEffect(() => {
     return () => {
@@ -47,13 +49,20 @@ export function InputArea({ onStreamingContent, onStreamEnd, onSdkSessionId }: I
     abortControllerRef.current = new AbortController();
 
     try {
-      const generator = apiClient.streamAIResponse(
-        {
-          prompt,
-          session_unique_id: selectedSession!.session_unique_id,
-          cwd: selectedSession!.directory,
-          settings: "",
-        },
+      const request: SendAIRequest = {
+        prompt,
+        session_unique_id: isNewSession ? null : selectedSession!.session_unique_id,
+        external_session_id: selectedSession!.external_session_id,
+        project_unique_id: selectedSession!.project_unique_id,
+        workspace_unique_id: selectedSession!.workspace_unique_id,
+        directory: selectedWorkspace?.directory || selectedSession!.directory,
+        cwd: selectedWorkspace?.directory || selectedSession!.directory,
+        settings: "",
+        system_prompt: "You are a helpful coding assistant",
+      };
+
+      const generator = apiClient.streamAIResponseV2(
+        request,
         abortControllerRef.current.signal
       );
 
@@ -61,14 +70,14 @@ export function InputArea({ onStreamingContent, onStreamEnd, onSdkSessionId }: I
 
       for await (const event of generator) {
         if (event.type === "chunk" && event.content) {
-          const content = typeof event.content === "string" 
-            ? event.content 
+          const content = typeof event.content === "string"
+            ? event.content
             : JSON.stringify(event.content);
           accumulatedContent += content;
           onStreamingContent?.(accumulatedContent);
         } else if (event.type === "done") {
-          if (event.sdk_session_id) {
-            onSdkSessionId?.(event.sdk_session_id);
+          if (isNewSession && event.session_unique_id) {
+            markSessionPersisted(event.session_unique_id, "");
           }
           onStreamEnd?.();
         } else if (event.type === "error") {
@@ -87,7 +96,7 @@ export function InputArea({ onStreamingContent, onStreamEnd, onSdkSessionId }: I
       setIsSending(false);
       abortControllerRef.current = null;
     }
-  }, [input, isDisabled, selectedSession, onStreamingContent, onStreamEnd]);
+  }, [input, isDisabled, selectedSession, selectedWorkspace, isNewSession, markSessionPersisted, onStreamingContent, onStreamEnd]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey && !(e.metaKey || e.ctrlKey)) {

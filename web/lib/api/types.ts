@@ -80,7 +80,6 @@ export interface Session {
   id: number;
   session_unique_id: string;
   external_session_id: string;
-  sdk_session_id?: string | null;
   project_unique_id: string;
   workspace_unique_id: string;
   directory: string;
@@ -161,12 +160,27 @@ export interface AISendResponse {
   status: string;
 }
 
+/**
+ * Unified AI send request that supports both new sessions (session_unique_id = null)
+ * and existing sessions.
+ */
+export interface SendAIRequest {
+  prompt: string;
+  session_unique_id?: string | null;  // null = new session
+  external_session_id: string;         // Required (uuidv7 from frontend)
+  project_unique_id: string;
+  workspace_unique_id: string;
+  directory: string;
+  cwd: string;
+  settings: string;
+  system_prompt?: string;
+}
+
 export interface SSEEvent {
   type: 'chunk' | 'done' | 'error';
   content?: unknown;
   session_unique_id?: string;
   message?: string;
-  sdk_session_id?: string;
 }
 
 // ============================================

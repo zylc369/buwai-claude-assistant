@@ -143,7 +143,6 @@ describe('sessionsApi', () => {
       const mockCreatedSession: Session = {
         id: 2,
         ...createData,
-        sdk_session_id: null,
         gmt_create: 1234567891,
         gmt_modified: 1234567891,
         time_compacting: null,

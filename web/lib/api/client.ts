@@ -15,6 +15,7 @@ import type {
   CreateMessageRequest,
   ListMessagesParams,
   AISendRequest,
+  SendAIRequest,
   SSEEvent,
   SSEConnectionState,
   SSEState,
@@ -272,26 +273,89 @@ export class APIClient {
   async *streamAIResponse(request: AISendRequest, signal?: AbortSignal): AsyncGenerator<SSEEvent> {
     const response = await this.sendAIPrompt(request, signal);
     const reader = response.body?.getReader();
-    
+
     if (!reader) {
       throw new ApiClientError('No response body', 500);
     }
-    
+
     const decoder = new TextDecoder();
     let buffer = '';
-    
+
     while (true) {
       const { done, value } = await reader.read();
-      
+
       if (done) {
         break;
       }
-      
+
       buffer += decoder.decode(value, { stream: true });
-      
+
       const lines = buffer.split('\n');
       buffer = lines.pop() || '';
-      
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const data = line.slice(6);
+          if (data.trim()) {
+            try {
+              const event = JSON.parse(data) as SSEEvent;
+              yield event;
+            } catch {
+              // Skip malformed JSON
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // ============================================
+  // AI Send V2 method (supports new sessions)
+  // ============================================
+
+  async sendAIPromptV2(request: SendAIRequest, signal?: AbortSignal): Promise<Response> {
+    const url = `${API_BASE_URL}/messages/send-v2`;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(request),
+      signal,
+    });
+
+    if (!response.ok) {
+      const error: ApiError = await response.json();
+      throw new ApiClientError(error.detail || 'An error occurred', response.status);
+    }
+
+    return response;
+  }
+
+  async *streamAIResponseV2(request: SendAIRequest, signal?: AbortSignal): AsyncGenerator<SSEEvent> {
+    const response = await this.sendAIPromptV2(request, signal);
+    const reader = response.body?.getReader();
+
+    if (!reader) {
+      throw new ApiClientError('No response body', 500);
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+
+      if (done) {
+        break;
+      }
+
+      buffer += decoder.decode(value, { stream: true });
+
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
       for (const line of lines) {
         if (line.startsWith('data: ')) {
           const data = line.slice(6);

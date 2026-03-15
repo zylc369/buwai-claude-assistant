@@ -86,7 +86,6 @@ class Session(Base, TestMixin):
     id = Column(Integer, primary_key=True, autoincrement=True)
     session_unique_id = Column(Text, unique=True, nullable=False)
     external_session_id = Column(Text, nullable=False)
-    sdk_session_id = Column(Text, nullable=True)
     project_unique_id = Column(
         Text,
         ForeignKey("project.project_unique_id", ondelete="CASCADE"),

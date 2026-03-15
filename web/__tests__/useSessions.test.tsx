@@ -46,7 +46,6 @@ function createMockSession(overrides?: Partial<Session>): Session {
     id: 1,
     session_unique_id: 'session-1',
     external_session_id: 'ext-session-1',
-    sdk_session_id: null,
     project_unique_id: 'project-1',
     workspace_unique_id: 'workspace-1',
     directory: '/workspace',

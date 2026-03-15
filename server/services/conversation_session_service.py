@@ -170,6 +170,28 @@ class ConversationSessionService:
         logger.debug(f"get_session_by_external_id completed, found={result is not None}")
         return result
 
+    async def validate_new_session_external_id(
+        self,
+        external_session_id: str,
+        test: bool = False
+    ) -> None:
+        """Validate external_session_id doesn't already exist.
+        
+        This is used to ensure new sessions have unique external IDs.
+        
+        Args:
+            external_session_id: The external session ID to validate
+            test: Test flag for data isolation
+            
+        Raises:
+            ValueError: If external_session_id already exists in session table
+        """
+        existing = await self.session_repo.get_by_external_session_id(
+            external_session_id, test=test
+        )
+        if existing is not None:
+            raise ValueError(f"external_session_id '{external_session_id}' already exists")
+
     async def list_sessions(
         self,
         project_unique_id: Optional[str] = None,

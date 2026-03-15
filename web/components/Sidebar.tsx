@@ -3,14 +3,12 @@
 import { useState } from "react";
 import { Dialog } from "@base-ui/react";
 import { Plus, MessageSquare, FolderOpen } from "lucide-react";
-import { uuidv7 } from "uuidv7";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useWorkspaceStore, useSessionStore, useProjectStore } from "@/lib/store";
 import { useWorkspaces, useCreateWorkspace } from "@/hooks/useWorkspaces";
-import { useCreateSession } from "@/hooks/useSessions";
+import { useSessions } from "@/hooks/useSessions";
 import { cn } from "@/lib/utils";
-import type { Session } from "@/lib/api/types";
 
 export function Sidebar() {
   const [isCreateWorkspaceDialogOpen, setIsCreateWorkspaceDialogOpen] = useState(false);
@@ -19,14 +17,17 @@ export function Sidebar() {
   const [newWorkspaceBranch, setNewWorkspaceBranch] = useState("");
 
   const { selectedWorkspace, setSelectedWorkspace } = useWorkspaceStore();
-  const { selectedSession, setSelectedSession } = useSessionStore();
+  const { selectedSession, setSelectedSession, isNewSession, createNewSession } = useSessionStore();
   const { selectedProject } = useProjectStore();
 
   const { data: workspaces = [], isLoading: workspacesLoading } = useWorkspaces(selectedProject?.project_unique_id);
+  const { data: sessions = [], isLoading: sessionsLoading } = useSessions({
+    project_unique_id: selectedProject?.project_unique_id || '',
+    workspace_unique_id: selectedWorkspace?.workspace_unique_id || '',
+  });
   const createWorkspace = useCreateWorkspace();
-  const createSession = useCreateSession();
 
-  const sessions: Session[] = [];
+  const sortedSessions = [...sessions].sort((a, b) => b.gmt_create - a.gmt_create);
 
   const handleCreateWorkspace = async () => {
     if (!newWorkspaceName.trim() || !newWorkspaceDirectory.trim() || !selectedProject) return;
@@ -47,25 +48,9 @@ export function Sidebar() {
     }
   };
 
-  const handleCreateSession = async () => {
+  const handleCreateSession = () => {
     if (!selectedWorkspace || !selectedProject) return;
-
-    const externalSessionId = uuidv7();
-    const directory = selectedProject.directory || selectedWorkspace.directory || "";
-
-    try {
-      const newSession = await createSession.mutateAsync({
-        session_unique_id: crypto.randomUUID(),
-        external_session_id: externalSessionId,
-        project_unique_id: selectedProject.project_unique_id,
-        workspace_unique_id: selectedWorkspace.workspace_unique_id,
-        directory: directory,
-        title: "New Chat",
-      });
-      setSelectedSession(newSession);
-    } catch (error) {
-      console.error("Failed to create session:", error);
-    }
+    createNewSession(selectedProject, selectedWorkspace);
   };
 
   const formatTime = (timestamp: number) => {
@@ -151,12 +136,11 @@ export function Sidebar() {
           <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
             Sessions
           </h3>
-          {selectedWorkspace && (
+          {selectedProject && selectedWorkspace && (
             <Button
               variant="ghost"
               size="icon-xs"
               onClick={handleCreateSession}
-              disabled={createSession.isPending}
               className="h-5 w-5"
             >
               <Plus className="size-3" />
@@ -169,31 +153,60 @@ export function Sidebar() {
             <div className="px-3 py-2 text-sm text-muted-foreground">
               Select a workspace
             </div>
-          ) : sessions.length === 0 ? (
+          ) : sessionsLoading ? (
             <div className="px-3 py-2 text-sm text-muted-foreground">
-              No sessions yet
+              Loading...
             </div>
           ) : (
-            sessions.map((session) => (
-              <button
-                key={session.id}
-                onClick={() => setSelectedSession(session)}
-                className={cn(
-                  "w-full flex items-start gap-2 rounded-md px-3 py-2 text-left",
-                  "hover:bg-accent hover:text-accent-foreground",
-                  "focus:bg-accent focus:text-accent-foreground outline-none",
-                  selectedSession?.id === session.id && "bg-accent/50"
-                )}
-              >
-                <MessageSquare className="size-4 shrink-0 mt-0.5 text-muted-foreground" />
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm truncate">{session.title}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {formatTime(session.gmt_modified)}
+            <>
+              {isNewSession && selectedSession && (
+                <button
+                  className={cn(
+                    "w-full flex items-start gap-2 rounded-md px-3 py-2 text-left",
+                    "bg-accent/50 border border-primary/20",
+                    "focus:bg-accent focus:text-accent-foreground outline-none"
+                  )}
+                >
+                  <MessageSquare className="size-4 shrink-0 mt-0.5 text-primary" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm truncate flex items-center gap-1.5">
+                      <span>{selectedSession.title || 'New Chat'}</span>
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium">New</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Just now
+                    </div>
                   </div>
+                </button>
+              )}
+              
+              {sortedSessions.length === 0 && !isNewSession ? (
+                <div className="px-3 py-2 text-sm text-muted-foreground">
+                  No sessions yet
                 </div>
-              </button>
-            ))
+              ) : (
+                sortedSessions.map((session) => (
+                  <button
+                    key={session.id}
+                    onClick={() => setSelectedSession(session)}
+                    className={cn(
+                      "w-full flex items-start gap-2 rounded-md px-3 py-2 text-left",
+                      "hover:bg-accent hover:text-accent-foreground",
+                      "focus:bg-accent focus:text-accent-foreground outline-none",
+                      selectedSession?.id === session.id && !isNewSession && "bg-accent/50"
+                    )}
+                  >
+                    <MessageSquare className="size-4 shrink-0 mt-0.5 text-muted-foreground" />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm truncate">{session.title || session.session_unique_id}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {formatTime(session.gmt_modified)}
+                      </div>
+                    </div>
+                  </button>
+                ))
+              )}
+            </>
           )}
         </div>
       </div>

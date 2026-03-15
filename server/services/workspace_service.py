@@ -198,6 +198,37 @@ class WorkspaceService:
         logger.debug(f"get_workspace_by_unique_id completed, found={result is not None}")
         return result
     
+    async def validate_workspace_exists(
+        self, 
+        workspace_unique_id: str, 
+        expected_directory: str,
+        test: bool = False
+    ) -> Workspace:
+        """Validate workspace exists and directory matches.
+        
+        Args:
+            workspace_unique_id: The workspace's unique identifier
+            expected_directory: The expected directory value
+            test: Test flag for data isolation
+            
+        Returns:
+            Workspace instance if validation passes
+            
+        Raises:
+            ValueError: If workspace not found or directory doesn't match
+        """
+        workspace = await self.workspace_repo.get_by_unique_id(workspace_unique_id, test=test)
+        if not workspace:
+            raise ValueError(f"Workspace not found: {workspace_unique_id}")
+        
+        if workspace.directory != expected_directory:
+            raise ValueError(
+                f"Workspace directory mismatch: expected '{expected_directory}', "
+                f"actual '{workspace.directory}'"
+            )
+        
+        return workspace
+    
     async def list_workspaces(
         self,
         project_unique_id: str,

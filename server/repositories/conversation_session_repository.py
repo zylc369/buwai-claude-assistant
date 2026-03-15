@@ -87,7 +87,6 @@ class ConversationSessionRepository(BaseRepository[Session]):
         workspace_unique_id: str,
         directory: str,
         title: str,
-        sdk_session_id: Optional[str] = None,
         gmt_create: Optional[int] = None,
         gmt_modified: Optional[int] = None,
         test: bool = False,
@@ -101,7 +100,6 @@ class ConversationSessionRepository(BaseRepository[Session]):
             workspace_unique_id: Unique identifier for the workspace.
             directory: Session directory path.
             title: Session title.
-            sdk_session_id: SDK session identifier (optional).
             gmt_create: Creation timestamp (defaults to current time).
             gmt_modified: Update timestamp (defaults to current time).
             test: Whether this is a test session (default: False).
@@ -125,7 +123,6 @@ class ConversationSessionRepository(BaseRepository[Session]):
                 workspace_unique_id=workspace_unique_id,
                 directory=directory,
                 title=title,
-                sdk_session_id=sdk_session_id,
                 gmt_create=gmt_create,
                 gmt_modified=gmt_modified,
                 test=test,
@@ -139,7 +136,6 @@ class ConversationSessionRepository(BaseRepository[Session]):
     async def update_session(
         self,
         session: Session,
-        sdk_session_id: Optional[str] = None,
         title: Optional[str] = None,
         directory: Optional[str] = None,
         test: bool = False,
@@ -148,7 +144,6 @@ class ConversationSessionRepository(BaseRepository[Session]):
 
         Args:
             session: Session instance to update.
-            sdk_session_id: SDK session identifier to update (optional).
             title: Title to update (optional).
             directory: Directory to update (optional).
             test: Filter by test flag (default: False).
@@ -157,10 +152,8 @@ class ConversationSessionRepository(BaseRepository[Session]):
             Updated Session instance.
         """
         try:
-            logger.debug(f"update_session called with session.id={session.id}, sdk_session_id={sdk_session_id}, title={title}, directory={directory}, test={test}")
+            logger.debug(f"update_session called with session.id={session.id}, title={title}, directory={directory}, test={test}")
             update_kwargs = {}
-            if sdk_session_id is not None:
-                update_kwargs["sdk_session_id"] = sdk_session_id
             if title is not None:
                 update_kwargs["title"] = title
             if directory is not None:

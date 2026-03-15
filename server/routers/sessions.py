@@ -34,7 +34,6 @@ class SessionResponse(BaseModel):
     id: int
     session_unique_id: str
     external_session_id: str
-    sdk_session_id: Optional[str] = None
     project_unique_id: str
     workspace_unique_id: str
     directory: str

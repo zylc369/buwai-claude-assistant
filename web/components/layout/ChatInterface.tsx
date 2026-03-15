@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useWorkspaceStore } from "@/lib/stores/useWorkspaceStore";
 import { useSessionStore } from "@/lib/stores/useSessionStore";
+import { useMessages } from "@/hooks/useMessages";
 import { ChatArea } from "./ChatArea";
 import { InputArea } from "../InputArea";
 import { apiClient } from "@/lib/api/client";
@@ -17,13 +18,18 @@ type ChatMode = "streaming" | "polling";
 
 export function ChatInterface() {
   const { selectedWorkspace } = useWorkspaceStore();
-  const { selectedSession } = useSessionStore();
+  const { selectedSession, isNewSession } = useSessionStore();
   const [streamingContent, setStreamingContent] = useState<string>("");
   const [mode, setMode] = useState<ChatMode>("polling");
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [incrementalMessages, setIncrementalMessages] = useState<Message[]>([]);
   const [lastMessageId, setLastMessageId] = useState<number>(0);
-  const [isLoading, setIsLoading] = useState(false);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const { data: fetchedMessages = [], isLoading } = useMessages({
+    session_unique_id: selectedSession?.session_unique_id || "",
+  });
+
+  const messages = isNewSession ? [] : [...fetchedMessages, ...incrementalMessages];
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -48,28 +54,6 @@ export function ChatInterface() {
     setStreamingContent("");
   }, []);
 
-  const loadInitialMessages = useCallback(async (sessionUniqueId: string) => {
-    if (!sessionUniqueId) return;
-    
-    setIsLoading(true);
-    try {
-      const allMessages = await apiClient.getMessages({ 
-        session_unique_id: sessionUniqueId 
-      });
-      setMessages(allMessages);
-      if (allMessages.length > 0) {
-        const maxId = Math.max(...allMessages.map(m => m.id));
-        setLastMessageId(maxId);
-      } else {
-        setLastMessageId(0);
-      }
-    } catch (error) {
-      console.error("Failed to load messages:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
   const fetchIncrementalMessages = useCallback(async (sessionUniqueId: string, afterId: number) => {
     if (!sessionUniqueId) return;
     
@@ -80,7 +64,7 @@ export function ChatInterface() {
       });
       
       if (newMessages.length > 0) {
-        setMessages(prev => [...prev, ...newMessages]);
+        setIncrementalMessages(prev => [...prev, ...newMessages]);
         const maxId = Math.max(...newMessages.map(m => m.id));
         setLastMessageId(maxId);
       }
@@ -90,17 +74,17 @@ export function ChatInterface() {
   }, []);
 
   useEffect(() => {
-    if (!selectedSession?.session_unique_id) {
-      setMessages([]);
+    setIncrementalMessages([]);
+    if (fetchedMessages.length > 0) {
+      const maxId = Math.max(...fetchedMessages.map(m => m.id));
+      setLastMessageId(maxId);
+    } else {
       setLastMessageId(0);
-      return;
     }
-
-    loadInitialMessages(selectedSession.session_unique_id);
-  }, [selectedSession?.session_unique_id, loadInitialMessages]);
+  }, [selectedSession?.session_unique_id, fetchedMessages.length]);
 
   useEffect(() => {
-    if (mode !== "polling" || !selectedSession?.session_unique_id) {
+    if (mode !== "polling" || !selectedSession?.session_unique_id || isNewSession) {
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current);
         pollingIntervalRef.current = null;
@@ -118,7 +102,7 @@ export function ChatInterface() {
         pollingIntervalRef.current = null;
       }
     };
-  }, [mode, selectedSession?.session_unique_id, lastMessageId, fetchIncrementalMessages]);
+  }, [mode, selectedSession?.session_unique_id, isNewSession, lastMessageId, fetchIncrementalMessages]);
 
   useEffect(() => {
     return () => {
