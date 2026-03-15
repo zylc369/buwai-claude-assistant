@@ -13,6 +13,7 @@ from routers.projects import router as projects_router
 from routers.sessions import router as sessions_router
 from routers.workspaces import router as workspaces_router
 from routers.messages import router as messages_router
+from routers.ai_resources import router as ai_resources_router
 try:
     from routers.events import router as events_router
 except ImportError:
@@ -76,6 +77,7 @@ app.include_router(projects_router)
 app.include_router(sessions_router)
 app.include_router(workspaces_router)
 app.include_router(messages_router)
+app.include_router(ai_resources_router)
 if events_router:
     app.include_router(events_router)
 

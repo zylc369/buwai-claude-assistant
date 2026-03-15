@@ -5,6 +5,7 @@ from .workspace_service import WorkspaceService
 from .message_service import MessageService
 from .conversation_session_service import ConversationSessionService
 from .sse_service import SSEService, SSEEventType
+from .ai_resource_service import AiResourceService
 
 __all__ = [
     "ProjectService",
@@ -13,4 +14,5 @@ __all__ = [
     "ConversationSessionService",
     "SSEService",
     "SSEEventType",
+    "AiResourceService",
 ]

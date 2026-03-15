@@ -135,3 +135,20 @@ class Message(Base, TestMixin):
     __table_args__ = (
         Index("message_session_unique_idx", "session_unique_id"),
     )
+
+
+class AiResource(Base, TestMixin):
+    """AI resource model for skills, commands, and system prompts."""
+
+    __tablename__ = "ai_resource"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    resource_unique_id = Column(Text, unique=True, nullable=False)
+    name = Column(Text, nullable=False)
+    type = Column(Text, nullable=False)
+    sub_type = Column(Text, nullable=False)
+    owner = Column(Text, nullable=True)
+    disabled = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    content = Column(Text, nullable=False)
+    gmt_create = Column(Integer, nullable=False)
+    gmt_modified = Column(Integer, nullable=False)

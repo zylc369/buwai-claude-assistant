@@ -28,7 +28,7 @@ logger = get_logger(__name__)
 ENV_VAR_PATTERN = re.compile(r'\$\{([^}:]+)(?::([^}]*))?\}')
 
 # Known config section prefixes for env var overrides
-CONFIG_SECTIONS = {"SERVER", "DATABASE", "LOGGING", "PROJECTS"}
+CONFIG_SECTIONS = {"SERVER", "DATABASE", "LOGGING", "PROJECTS", "AI_RESOURCES"}
 
 
 class CorsConfig(BaseModel):
@@ -151,6 +151,53 @@ class ProjectsConfig(BaseModel):
         return v.strip()
 
 
+class AIResourcesConfig(BaseModel):
+    """AI resources configuration.
+    
+    Attributes:
+        root_dir: Root directory for AI resources (relative or absolute path).
+        refresh_interval_ms: Refresh interval in milliseconds.
+    """
+    root_dir: str = "ai_resource"
+    refresh_interval_ms: int = 600000  # 10 minutes
+    
+    @field_validator('root_dir')
+    @classmethod
+    def validate_root_dir(cls, v: str) -> str:
+        """Validate that root_dir path is not empty.
+        
+        Args:
+            v: The root_dir path value to validate.
+            
+        Returns:
+            The validated root_dir path.
+            
+        Raises:
+            ValueError: If the root_dir path is empty.
+        """
+        if not v or not v.strip():
+            raise ValueError("AI resources root_dir path cannot be empty")
+        return v.strip()
+    
+    @field_validator('refresh_interval_ms')
+    @classmethod
+    def validate_refresh_interval_ms(cls, v: int) -> int:
+        """Validate that refresh_interval_ms is positive.
+        
+        Args:
+            v: The refresh_interval_ms value to validate.
+            
+        Returns:
+            The validated refresh_interval_ms.
+            
+        Raises:
+            ValueError: If the refresh_interval_ms is not positive.
+        """
+        if v <= 0:
+            raise ValueError("AI resources refresh_interval_ms must be positive")
+        return v
+
+
 class AppConfig(BaseModel):
     """Root application configuration.
     
@@ -162,11 +209,13 @@ class AppConfig(BaseModel):
         database: Database connection configuration.
         logging: Logging configuration settings.
         projects: Projects directory configuration.
+        ai_resources: AI resources configuration.
     """
     server: ServerConfig = Field(default_factory=ServerConfig)
     database: DatabaseConfig = Field(default_factory=DatabaseConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     projects: ProjectsConfig = Field(default_factory=ProjectsConfig)
+    ai_resources: AIResourcesConfig = Field(default_factory=AIResourcesConfig)
 
 
 def interpolate_env_vars(value: Any) -> Any:
@@ -369,6 +418,9 @@ def print_config(config: AppConfig, config_path: Path) -> None:
     print(f"  date_format: {config.logging.date_format}", file=sys.stderr)
     print("projects:", file=sys.stderr)
     print(f"  root: {config.projects.root}", file=sys.stderr)
+    print("ai_resources:", file=sys.stderr)
+    print(f"  root_dir: {config.ai_resources.root_dir}", file=sys.stderr)
+    print(f"  refresh_interval_ms: {config.ai_resources.refresh_interval_ms}", file=sys.stderr)
     print("=" * 60 + "\n", file=sys.stderr)
 
 
@@ -409,6 +461,7 @@ __all__ = [
     "CorsConfig",
     "LoggingConfig",
     "ProjectsConfig",
+    "AIResourcesConfig",
     "get_config",
     "reset_config_cache",
     "load_config",

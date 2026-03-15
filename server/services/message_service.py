@@ -1,5 +1,6 @@
 """Message service for business logic with AI integration."""
 
+import asyncio
 import json
 from typing import List, Optional, Dict, Any, AsyncIterator
 
@@ -9,6 +10,7 @@ from database.models import Message
 from repositories.message_repository import MessageRepository
 from repositories.project_repository import ProjectRepository
 from repositories.workspace_repository import WorkspaceRepository
+from services.ai_resource_service import AiResourceService
 from claude_client import ClaudeClient, ClaudeClientConfig
 from pool import ClaudeClientPool
 from utils.id_generator import generate_uuidv7
@@ -16,6 +18,25 @@ from utils.timestamp import get_timestamp_ms
 from logger import get_logger
 
 logger = get_logger(__name__)
+
+# Per-workspace sync locks to prevent concurrent syncs
+_sync_locks: Dict[str, asyncio.Lock] = {}
+
+
+async def _acquire_sync_lock(workspace_dir: str) -> None:
+    """Acquire sync lock for a workspace directory.
+    
+    Creates a new lock if one doesn't exist for the workspace.
+    """
+    if workspace_dir not in _sync_locks:
+        _sync_locks[workspace_dir] = asyncio.Lock()
+    await _sync_locks[workspace_dir].acquire()
+
+
+def _release_sync_lock(workspace_dir: str) -> None:
+    """Release sync lock for a workspace directory."""
+    if workspace_dir in _sync_locks and _sync_locks[workspace_dir].locked():
+        _sync_locks[workspace_dir].release()
 
 
 class MessageService:
@@ -252,9 +273,35 @@ class MessageService:
         ai_chunks = []
         logger.info(f"AI operation: querying AI client (using pool={pool is not None})")
 
+        synced_system_prompt: Optional[str] = None
+
+        if workspace_unique_id:
+            workspace_repo = WorkspaceRepository(self.session)
+            workspace = await workspace_repo.get_by_unique_id(workspace_unique_id, test=test)
+            if workspace is not None:
+                workspace_dir = getattr(workspace, 'directory', '')
+                try:
+                    await _acquire_sync_lock(workspace_dir)
+                    ai_resource_service = AiResourceService(self.session)
+                    synced_system_prompt = await ai_resource_service.sync_ai_resources(workspace)
+                    logger.info(f"AI resources synced for workspace {workspace_unique_id}")
+                except Exception as e:
+                    logger.error(f"Failed to sync AI resources for workspace {workspace_unique_id}: {e}")
+                finally:
+                    _release_sync_lock(workspace_dir)
+
+        effective_config = client_config
+        if synced_system_prompt:
+            effective_config = ClaudeClientConfig(
+                cwd=client_config.cwd,
+                settings=client_config.settings,
+                system_prompt=synced_system_prompt
+            )
+            logger.debug(f"Using synced system_prompt of length {len(synced_system_prompt)}")
+
         try:
             if pool is not None:
-                client = await pool.get_client(session_unique_id, client_config)
+                client = await pool.get_client(session_unique_id, effective_config)
                 try:
                     await client.query(prompt, session_unique_id)
                     async for response in await client.receive_response():
@@ -263,7 +310,7 @@ class MessageService:
                 finally:
                     await pool.release_client(session_unique_id)
             else:
-                async with ClaudeClient(client_config) as client:
+                async with ClaudeClient(effective_config) as client:
                     await client.query(prompt, session_unique_id)
                     async for response in await client.receive_response():
                         ai_chunks.append(response)

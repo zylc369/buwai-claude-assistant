@@ -132,6 +132,20 @@ export function Sidebar() {
         </div>
       </div>
 
+      <div className="border-b border-border">
+        <div className="px-3 py-2 flex items-center justify-between">
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            AI Resources
+          </h3>
+          <a
+            href="/ai-resources"
+            className="text-sm hover:underline text-muted-foreground hover:text-accent-foreground"
+          >
+            Manage
+          </a>
+        </div>
+      </div>
+
       <div className="flex-1 flex flex-col min-h-0">
         <div className="px-3 py-2 flex items-center justify-between border-b border-border">
           <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">

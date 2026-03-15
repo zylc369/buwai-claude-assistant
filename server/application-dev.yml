@@ -19,3 +19,7 @@ logging:
 
 projects:
   root: "dev-projectsRoot"
+
+ai_resources:
+  root_dir: "ai_resource"
+  refresh_interval_ms: 30000

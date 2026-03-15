@@ -20,6 +20,10 @@ import type {
   SSEState,
   SessionExecutionState,
   PersistedState,
+  AIResource,
+  CreateAIResourceRequest,
+  UpdateAIResourceRequest,
+  ListAIResourcesParams,
 } from './types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
@@ -215,7 +219,32 @@ export class APIClient {
   async getMessageByUniqueId(messageUniqueId: string): Promise<Message> {
     return api.get<Message>(`/messages/${messageUniqueId}`);
   }
-  
+
+  // ============================================
+  // AI Resource methods
+  // ============================================
+
+  async getAIResources(params?: ListAIResourcesParams): Promise<AIResource[]> {
+    const query = buildQueryString(params);
+    return api.get<AIResource[]>(`/ai-resources/${query}`);
+  }
+
+  async createAIResource(data: CreateAIResourceRequest): Promise<AIResource> {
+    return api.post<AIResource>('/ai-resources/', data);
+  }
+
+  async getAIResourceById(resource_unique_id: string): Promise<AIResource> {
+    return api.get<AIResource>(`/ai-resources/${resource_unique_id}`);
+  }
+
+  async updateAIResource(resource_unique_id: string, data: UpdateAIResourceRequest): Promise<AIResource> {
+    return api.put<AIResource>(`/ai-resources/${resource_unique_id}`, data);
+  }
+
+  async deleteAIResource(resource_unique_id: string): Promise<void> {
+    return api.delete<void>(`/ai-resources/${resource_unique_id}`);
+  }
+
   // ============================================
   // AI Send method (streaming)
   // ============================================

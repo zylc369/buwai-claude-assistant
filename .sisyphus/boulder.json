@@ -1,30 +1,9 @@
 {
-  "active_plan": "/Users/aserlili/Documents/Codes/buwai-claude-assistant/.sisyphus/plans/frontend-chat-fix.md",
-  "started_at": "2026-03-13T13:51:27.011Z",
-  "session_ids": [
-    "ses_318ac4ed9ffeP3BccVfIyk2dOG"
-  ],
-  "plan_name": "frontend-chat-fix",
+  "active_plan": "/home/aiuser/Codes/buwai-claude-assistant/.sisyphus/plans/ai-resource-management.md",
+  "started_at": "2026-03-15T06:40:00.000Z",
+  "session_ids": ["ses_31031e328ffeABTa6uJFybSZIu"],
+  "plan_name": "ai-resource-management",
+  "completed_tasks": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
   "agent": "atlas",
-  "completed_tasks": [
-    1,
-    2,
-    3,
-    4,
-    5,
-    6,
-    7,
-    8,
-    9,
-    10,
-    11,
-    12,
-    13,
-    14,
-    15,
-    16,
-    17,
-    18
-  ],
   "status": "all_tasks_completed"
 }

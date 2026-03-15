@@ -271,3 +271,59 @@ export interface UpdateTaskRequest {
 }
 
 export type ChatSession = Session;
+
+// ============================================
+// AI Resource types
+// ============================================
+
+export type AIResourceType = 'SKILL' | 'COMMAND' | 'SYSTEM_PROMPT';
+export type ContentSchemaType = 'MD' | 'SHELL';
+
+export interface ContentSchema {
+  type: ContentSchemaType;
+  data: string;
+}
+
+export interface AIResource {
+  id: number;
+  resource_unique_id: string;
+  name: string;
+  type: AIResourceType;
+  sub_type: string;
+  owner: string | null;
+  disabled: boolean;
+  content: ContentSchema;
+  gmt_create: number;
+  gmt_modified: number;
+  test: boolean;
+}
+
+export interface CreateAIResourceRequest {
+  resource_unique_id?: string;
+  name: string;
+  type: AIResourceType;
+  sub_type?: string;
+  owner?: string | null;
+  disabled?: boolean;
+  content: ContentSchema;
+  test?: boolean;
+}
+
+export interface UpdateAIResourceRequest {
+  name?: string;
+  type?: AIResourceType;
+  sub_type?: string;
+  owner?: string | null;
+  disabled?: boolean;
+  content?: ContentSchema;
+  test?: boolean;
+}
+
+export interface ListAIResourcesParams {
+  offset?: number;
+  limit?: number;
+  type?: AIResourceType;
+  owner?: string;
+  test?: boolean;
+  disabled?: boolean;
+}

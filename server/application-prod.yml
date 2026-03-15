@@ -16,3 +16,7 @@ logging:
 
 projects:
   root: "${PROJECTS_ROOT:projectsRoot}"
+
+ai_resources:
+  root_dir: "${AI_RESOURCES_ROOT_DIR:ai_resource}"
+  refresh_interval_ms: "${AI_RESOURCES_REFRESH_INTERVAL_MS:600000}"
