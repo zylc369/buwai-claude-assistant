@@ -54,7 +54,7 @@ export function InputArea({ onStreamingContent, onStreamEnd }: InputAreaProps) {
         session_unique_id: isNewSession ? null : selectedSession!.session_unique_id,
         external_session_id: selectedSession!.external_session_id,
         project_unique_id: selectedSession!.project_unique_id,
-        workspace_unique_id: selectedSession!.workspace_unique_id,
+        workspace_unique_id: selectedWorkspace?.workspace_unique_id || selectedSession!.workspace_unique_id,
         directory: selectedWorkspace?.directory || selectedSession!.directory,
         cwd: selectedWorkspace?.directory || selectedSession!.directory,
         settings: "",

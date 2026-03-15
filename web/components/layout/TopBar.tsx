@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Menu, Dialog } from "@base-ui/react";
 import { ChevronDown, Plus, FolderOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,9 +14,21 @@ export function TopBar() {
   const [newProjectName, setNewProjectName] = useState("");
   const [newProjectDirectory, setNewProjectDirectory] = useState("");
 
-  const { selectedProject, setSelectedProject } = useProjectStore();
+  const { selectedProject, setSelectedProject, clearProject } = useProjectStore();
   const { data: projects = [], isLoading } = useProjects();
   const createProject = useCreateProject();
+
+  // Clear stale selectedProject if it doesn't exist in the projects list
+  useEffect(() => {
+    if (!isLoading && selectedProject) {
+      const projectExists = projects.some(p => p.project_unique_id === selectedProject.project_unique_id);
+      if (!projectExists && projects.length > 0) {
+        setSelectedProject(projects[0]);
+      } else if (!projectExists && projects.length === 0) {
+        clearProject();
+      }
+    }
+  }, [projects, isLoading, selectedProject, setSelectedProject, clearProject]);
 
   const handleSelectProject = (project: typeof selectedProject) => {
     if (project) {

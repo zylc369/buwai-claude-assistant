@@ -16,9 +16,9 @@ export function Sidebar() {
   const [newWorkspaceDirectory, setNewWorkspaceDirectory] = useState("");
   const [newWorkspaceBranch, setNewWorkspaceBranch] = useState("");
 
-  const { selectedWorkspace, setSelectedWorkspace } = useWorkspaceStore();
-  const { selectedSession, setSelectedSession, isNewSession, createNewSession } = useSessionStore();
-  const { selectedProject } = useProjectStore();
+  const { selectedWorkspace, setSelectedWorkspace, clearWorkspace } = useWorkspaceStore();
+  const { selectedSession, setSelectedSession, isNewSession, createNewSession, clearSession } = useSessionStore();
+  const { selectedProject, clearProject: clearSelectedProject } = useProjectStore();
 
   const { data: workspaces = [], isLoading: workspacesLoading } = useWorkspaces(selectedProject?.project_unique_id);
   const { data: sessions = [], isLoading: sessionsLoading } = useSessions({
@@ -29,25 +29,48 @@ export function Sidebar() {
 
   const sortedSessions = [...sessions].sort((a, b) => b.gmt_create - a.gmt_create);
 
-  // Auto-select last session when workspace switches (需求 3.3)
+  // Clear stale selectedWorkspace when project changes or workspace doesn't exist in list
   useEffect(() => {
-    if (selectedWorkspace && sortedSessions.length > 0 && !isNewSession) {
-      if (!selectedSession || selectedSession.workspace_unique_id !== selectedWorkspace.workspace_unique_id) {
-        setSelectedSession(sortedSessions[0]);
+    if (!selectedProject && selectedWorkspace) {
+      clearWorkspace();
+      return;
+    }
+    if (!workspacesLoading && selectedWorkspace) {
+      const workspaceExists = workspaces.some(w => w.workspace_unique_id === selectedWorkspace.workspace_unique_id);
+      if (!workspaceExists) {
+        clearWorkspace();
       }
     }
-  }, [selectedWorkspace, sortedSessions, isNewSession, setSelectedSession, selectedSession]);
+  }, [selectedProject, workspaces, workspacesLoading, selectedWorkspace, clearWorkspace]);
+
+  // Auto-select last session when workspace switches (需求 3.3)
+  // Clear stale session when switching to workspace with no sessions
+  // Clear session when workspace becomes null
+  useEffect(() => {
+    if (selectedWorkspace) {
+      if (sortedSessions.length > 0 && !isNewSession) {
+        if (!selectedSession || selectedSession.workspace_unique_id !== selectedWorkspace.workspace_unique_id) {
+          setSelectedSession(sortedSessions[0]);
+        }
+      } else if (sortedSessions.length === 0 && selectedSession && selectedSession.workspace_unique_id !== selectedWorkspace.workspace_unique_id) {
+        clearSession();
+      }
+    } else if (selectedSession) {
+      clearSession();
+    }
+  }, [selectedWorkspace, sortedSessions, isNewSession, setSelectedSession, selectedSession, clearSession]);
 
   const handleCreateWorkspace = async () => {
     if (!newWorkspaceName.trim() || !newWorkspaceDirectory.trim() || !selectedProject) return;
 
     try {
-      await createWorkspace.mutateAsync({
+      const newWorkspace = await createWorkspace.mutateAsync({
         workspace_unique_id: crypto.randomUUID(),
         project_unique_id: selectedProject.project_unique_id,
         branch: newWorkspaceBranch.trim() || undefined,
         directory: newWorkspaceDirectory.trim(),
       });
+      setSelectedWorkspace(newWorkspace);
       setIsCreateWorkspaceDialogOpen(false);
       setNewWorkspaceName("");
       setNewWorkspaceDirectory("");
