@@ -49,13 +49,18 @@ export function Sidebar() {
   // Create new session when workspace has no sessions (需求 3.4)
   useEffect(() => {
     if (selectedWorkspace) {
+      // If we have a valid persisted session for this workspace, keep it
+      if (selectedSession?.session_unique_id && selectedSession.workspace_unique_id === selectedWorkspace.workspace_unique_id) {
+        return;
+      }
+      
       if (sortedSessions.length > 0 && !isNewSession) {
         if (!selectedSession || selectedSession.workspace_unique_id !== selectedWorkspace.workspace_unique_id) {
           setSelectedSession(sortedSessions[0]);
         }
       } else if (sortedSessions.length === 0 && selectedSession && selectedSession.workspace_unique_id !== selectedWorkspace.workspace_unique_id) {
         clearSession();
-      } else if (sortedSessions.length === 0 && !isNewSession) {
+      } else if (sortedSessions.length === 0 && !isNewSession && !selectedSession?.session_unique_id) {
         createNewSession(selectedProject!, selectedWorkspace);
       }
     } else if (selectedSession) {
