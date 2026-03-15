@@ -1,78 +1,86 @@
 # PROJECT KNOWLEDGE BASE
 
-**Generated:** 2026-03-12
-**Commit:** c659d44
+**Generated:** 2026-03-15
+**Commit:** a02750b
 **Branch:** main
 
 ## OVERVIEW
 
-Claude SDK Python integration toolkit. Provides async REPL client wrapping `claude-agent-sdk` with streaming support, configuration management, and comprehensive testing.
+Full-stack Claude Assistant application with FastAPI backend and Next.js frontend. Python backend provides REST API + SSE streaming with Claude SDK integration. TypeScript frontend offers React-based UI with TanStack Query.
 
 ## STRUCTURE
 
 ```
 ./
-├── server/           # Core Python application (REPL client + SDK wrapper)
-├── docs/             # Documentation (Claude SDK settings guide)
-└── web/              # Placeholder for future frontend
+├── server/           # Python backend (FastAPI + Claude SDK)
+├── web/              # Next.js frontend (React 19 + TanStack Query)
+└── docs/             # Requirements docs (Chinese) + SDK guide
 ```
 
 ## WHERE TO LOOK
 
 | Task | Location | Notes |
 |------|----------|-------|
-| Run application | `server/main.py` | CLI entry point, `--cwd` required |
-| Extend client | `server/claude_client.py` | ClaudeClient wrapper class |
-| Add configuration | `server/requirements.txt` | Dependencies |
-| Read docs | `docs/claude-sdk-settings-guide.md` | SDK configuration reference |
-| Write tests | `server/tests/` | pytest suite (16 tests) |
+| Start backend API | `server/run.py` | Config-driven: `python run.py` |
+| Start backend CLI | `server/main.py` | REPL mode: `--cwd .` required |
+| Start frontend | `web/` | `npm run dev` (port 3000) |
+| Backend endpoints | `server/routers/` | REST + SSE endpoints |
+| Backend services | `server/services/` | Business logic layer |
+| Backend repos | `server/repositories/` | Data access layer |
+| Frontend API | `web/lib/api/` | API client + types |
+| Frontend hooks | `web/hooks/` | React Query hooks |
+| Database models | `server/database/models.py` | SQLAlchemy ORM |
+| Run tests | `server/tests/` | pytest (195 tests) |
 
 ## CONVENTIONS
 
-- **Python-first**: Pure Python 3.x project, no Node.js/TypeScript
-- **Virtual environment**: Use `server/.venv/` for isolation
-- **Entry point**: `server/main.py` - not at project root
-- **Async patterns**: All Claude API calls use `async with` context manager
-- **Settings**: Load from `~/.claude/settings.json` or custom path via `--settings`
+- **Backend entry**: `server/run.py` (config-driven) or `uvicorn app:app` (direct)
+- **Frontend entry**: `web/app/` (Next.js App Router)
+- **API base URL**: Backend at :8000, Frontend at :3000
+- **Config format**: YAML with `${VAR:default}` interpolation (Spring Boot style)
+- **Async pattern**: `async with ClaudeClient(config)` required for SDK
+- **Path alias**: `@/*` maps to `web/` root in TypeScript
 
 ## ANTI-PATTERNS (THIS PROJECT)
 
-- **Never** run from project root - always `cd server/` or use `python server/main.py`
+- **Never** run `main.py` without `--cwd` argument
 - **Never** instantiate `ClaudeSDKClient` directly - use `ClaudeClient` wrapper
-- **Never** skip `--cwd` argument - required for REPL operation
-- **Never** commit `.venv/` directory - already in `.gitignore`
+- **Never** skip `async with` context manager for ClaudeClient
+- **Never** commit `server/.venv/` or `web/node_modules/`
+- **Never** hardcode settings path - use config system
 
 ## UNIQUE STYLES
 
-- **Nested structure**: Main code in `server/` subdirectory, not at root
-- **Demo mode fallback**: Graceful degradation when SDK import fails (echoes input)
-- **Mock classes**: Test suite uses mirror classes of SDK types for isolation
-- **Dual output modes**: Streaming (incremental) vs non-streaming (aggregated)
-- **Verbose control**: `--quiet` hides tool calls, `--verbose` (default) shows them
+- **Layered backend**: routers → services → repositories pattern
+- **Spring Boot config**: `application.yml` with profiles (dev/prod)
+- **Connection pooling**: `ClaudeClientPool` with per-session locks
+- **SSE streaming**: AsyncGenerator + StreamingResponse for real-time
+- **Test isolation**: `test=True` flag on all DB models
+- **Mock SDK classes**: Test suite mirrors SDK types for isolation
 
 ## COMMANDS
 
 ```bash
-# Setup
-cd server
-source .venv/bin/activate
-pip install -r requirements.txt
+# Backend (from server/)
+cd server && source .venv/bin/activate
+python run.py                          # Start API (config-driven)
+uvicorn app:app --reload --port 8000  # Start API (direct)
+python main.py --cwd .                 # CLI REPL mode
+pytest tests/ -v                       # Run tests
 
-# Run REPL
-python main.py --cwd .
-
-# Run with options
-python main.py --cwd . --no-stream --quiet
-python main.py --cwd . --settings /path/to/settings.json
-
-# Run tests
-pytest tests/ -v
+# Frontend (from web/)
+cd web && npm install
+npm run dev                            # Dev server (port 3000)
+npm run build                          # Production build
+npm test                               # Vitest
 ```
 
 ## NOTES
 
-- Requires `ANTHROPIC_API_KEY` env var or `api_key` in `~/.claude/settings.json`
-- `web/` directory is empty placeholder for potential frontend
-- No CI/CD configured (no .github/workflows, no Makefile)
-- No Python package metadata (no setup.py, pyproject.toml at root)
-- See `server/AGENTS.md` for detailed server module documentation
+- Requires `ANTHROPIC_API_KEY` env var or in `~/.claude/settings.json`
+- Backend uses SQLite with WAL mode (`server/app.db`)
+- Frontend uses bun (bun.lock present)
+- Config profiles: `APP_PROFILE=dev` or `APP_PROFILE=prod`
+- Env overrides: `SERVER__PORT=9000` (double underscore syntax)
+- No CI/CD configured yet
+- See `server/AGENTS.md` for backend details, `web/AGENTS.md` for frontend
