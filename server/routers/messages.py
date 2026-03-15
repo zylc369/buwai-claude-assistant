@@ -275,9 +275,12 @@ async def send_ai_prompt_v2(
     For NEW sessions (session_unique_id is None):
     - Validates workspace exists
     - Validates external_session_id is unique
-    - Generates new session_unique_id
-    - Creates session with generated ID and title
-    - Returns session_unique_id in done event
+    - Uses temp ID for messages initially
+    - Calls SDK with external_session_id
+    - Extracts session_id from SDK's ResultMessage
+    - Updates message session_unique_id to SDK's session_id
+    - Creates session with SDK's session_id as session_unique_id
+    - Returns SDK's session_unique_id in done event
     
     For EXISTING sessions (session_unique_id provided):
     - Validates session exists in database
@@ -298,10 +301,13 @@ async def send_ai_prompt_v2(
     title_service = TitleGeneratorService(db)
 
     valid_cwd = get_valid_cwd(request.cwd)
-    session_unique_id: str
+    
+    is_new_session = request.session_unique_id is None
+    sdk_session_id_holder: List[str] = []
+    final_session_unique_id: str = ""
 
-    if request.session_unique_id is None:
-        logger.info("Creating new session")
+    if is_new_session:
+        logger.info("Processing new session request")
         
         try:
             await workspace_service.validate_workspace_exists(
@@ -322,30 +328,16 @@ async def send_ai_prompt_v2(
             logger.error(f"External session ID validation failed: {e}")
             raise HTTPException(status_code=400, detail=str(e))
         
-        session_unique_id = generate_uuidv7()
-        logger.info(f"Generated new session_unique_id: {session_unique_id}")
-        
-        title = title_service.generate_title(request.prompt)
-        logger.debug(f"Generated title: {title}")
-        
-        await session_service.create_session(
-            session_unique_id=session_unique_id,
-            external_session_id=request.external_session_id,
-            project_unique_id=request.project_unique_id,
-            workspace_unique_id=request.workspace_unique_id,
-            directory=request.directory,
-            title=title,
-            test=test
-        )
-        logger.info(f"Created session {session_unique_id} in database")
+        final_session_unique_id = f"temp-{request.external_session_id}"
+        logger.info(f"Using temp session ID for new session: {final_session_unique_id}")
     else:
-        session_unique_id = request.session_unique_id
-        logger.info(f"Using existing session: {session_unique_id}")
+        final_session_unique_id = request.session_unique_id
+        logger.info(f"Using existing session: {final_session_unique_id}")
         
-        existing_session = await session_service.get_by_unique_id(session_unique_id, test=test)
+        existing_session = await session_service.get_by_unique_id(final_session_unique_id, test=test)
         if not existing_session:
-            logger.error(f"Session not found: {session_unique_id}")
-            raise HTTPException(status_code=404, detail=f"Session not found: {session_unique_id}")
+            logger.error(f"Session not found: {final_session_unique_id}")
+            raise HTTPException(status_code=404, detail=f"Session not found: {final_session_unique_id}")
 
     client_config = ClaudeClientConfig(
         cwd=valid_cwd,
@@ -355,44 +347,78 @@ async def send_ai_prompt_v2(
 
     async def generate_stream():
         """Generate SSE stream from AI responses."""
+        nonlocal final_session_unique_id
+        
+        ai_chunks = []
         try:
             async for chunk in message_service.send_ai_prompt(
                 prompt=request.prompt,
-                session_unique_id=session_unique_id,
+                session_unique_id=final_session_unique_id,
                 client_config=client_config,
                 project_unique_id=request.project_unique_id,
                 workspace_unique_id=request.workspace_unique_id,
-                test=test
+                test=test,
+                external_session_id=request.external_session_id if is_new_session else None,
+                sdk_session_id=sdk_session_id_holder
             ):
-                # Serialize chunk to JSON for SSE
+                ai_chunks.append(chunk)
                 if hasattr(chunk, '__dict__'):
-                    # Handle object with attributes
                     data = json.dumps({
                         "type": "chunk",
                         "content": str(chunk)
                     }, default=str)
                 elif isinstance(chunk, (dict, list, str, int, float, bool)):
-                    # Handle JSON-serializable types
                     data = json.dumps({
                         "type": "chunk",
                         "content": chunk
                     })
                 else:
-                    # Handle other types
                     data = json.dumps({
                         "type": "chunk",
                         "content": str(chunk)
                     })
                 yield f"data: {data}\n\n"
 
-            # Send completion event with session_unique_id
+            if is_new_session:
+                if sdk_session_id_holder:
+                    sdk_session_id = sdk_session_id_holder[0]
+                    logger.info(f"Extracted SDK session_id: {sdk_session_id}")
+                    
+                    updated_count = await message_service.update_messages_session_id(
+                        old_session_id=final_session_unique_id,
+                        new_session_id=sdk_session_id,
+                        test=test
+                    )
+                    logger.info(f"Updated {updated_count} messages to SDK session_id")
+                    
+                    title = title_service.generate_title(request.prompt)
+                    await session_service.create_session(
+                        session_unique_id=sdk_session_id,
+                        external_session_id=request.external_session_id,
+                        project_unique_id=request.project_unique_id,
+                        workspace_unique_id=request.workspace_unique_id,
+                        directory=request.directory,
+                        title=title,
+                        test=test
+                    )
+                    logger.info(f"Created session {sdk_session_id} in database")
+                    
+                    final_session_unique_id = sdk_session_id
+                else:
+                    logger.error("Failed to extract SDK session_id from response")
+                    error_data = json.dumps({
+                        "type": "error",
+                        "message": "Failed to extract session_id from SDK response"
+                    })
+                    yield f"data: {error_data}\n\n"
+                    return
+
             done_data = json.dumps({
                 "type": "done",
-                "session_unique_id": session_unique_id
+                "session_unique_id": final_session_unique_id
             })
             yield f"data: {done_data}\n\n"
         except Exception as e:
-            # Send error event
             error_data = json.dumps({
                 "type": "error",
                 "message": str(e)
@@ -406,7 +432,7 @@ async def send_ai_prompt_v2(
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",  # Disable nginx buffering
+            "X-Accel-Buffering": "no",
         }
     )
 
