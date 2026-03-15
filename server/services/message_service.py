@@ -220,6 +220,27 @@ class MessageService:
         
         return "".join(text_parts)
     
+    def _extract_sdk_session_id(self, chunks: List[Any]) -> Optional[str]:
+        """Extract session_id from SDK response chunks.
+        
+        SDK returns session_id in ResultMessage and StreamEvent types.
+        This method scans all chunks to find the session_id.
+        
+        Args:
+            chunks: List of response chunk objects from Claude SDK.
+            
+        Returns:
+            The session_id if found, None otherwise.
+        """
+        for chunk in chunks:
+            # ResultMessage and StreamEvent have session_id attribute
+            if hasattr(chunk, 'session_id') and chunk.session_id:
+                logger.info(f"Extracted SDK session_id: {chunk.session_id}")
+                return chunk.session_id
+        
+        logger.warning("No session_id found in SDK response chunks")
+        return None
+    
     async def send_ai_prompt(
         self,
         prompt: str,
@@ -228,7 +249,9 @@ class MessageService:
         project_unique_id: Optional[str] = None,
         workspace_unique_id: Optional[str] = None,
         pool: Optional[ClaudeClientPool] = None,
-        test: bool = False
+        test: bool = False,
+        external_session_id: Optional[str] = None,
+        sdk_session_id: Optional[List[str]] = None
     ) -> AsyncIterator[Any]:
         """Send a prompt to AI and yield streaming responses.
 
@@ -238,12 +261,17 @@ class MessageService:
 
         Args:
             prompt: The user prompt to send to AI.
-            session_unique_id: Session identifier for conversation continuity.
+            session_unique_id: Session identifier for conversation continuity (existing session).
             client_config: Configuration for ClaudeClient.
             project_unique_id: Optional project identifier for activity tracking.
             workspace_unique_id: Optional workspace identifier for activity tracking.
             pool: Optional connection pool for client reuse.
             test: Test flag for created messages (default: False).
+            external_session_id: For new sessions, this is passed to SDK to identify the session.
+                                 The SDK will return its own session_id which should be used as
+                                 session_unique_id in the database.
+            sdk_session_id: Optional list to receive the SDK's session_id. If provided, 
+                           the SDK's session_id will be appended to this list.
 
         Yields:
             Response messages from the AI as an async iterator.
@@ -251,7 +279,12 @@ class MessageService:
         Raises:
             RuntimeError: If client connection fails.
         """
-        logger.debug(f"send_ai_prompt called with session_unique_id={session_unique_id}, test={test}")
+        # Determine which session_id to use for SDK call
+        # For new sessions: use external_session_id for SDK, then extract SDK's session_id
+        # For existing sessions: use session_unique_id directly
+        sdk_call_session_id = external_session_id if external_session_id else session_unique_id
+        
+        logger.debug(f"send_ai_prompt called with session_unique_id={session_unique_id}, external_session_id={external_session_id}, sdk_call_session_id={sdk_call_session_id}, test={test}")
         logger.info(f"AI operation: sending prompt of length {len(prompt)} characters")
         current_time = get_timestamp_ms()
 
@@ -301,20 +334,26 @@ class MessageService:
 
         try:
             if pool is not None:
-                client = await pool.get_client(session_unique_id, effective_config)
+                client = await pool.get_client(sdk_call_session_id, effective_config)
                 try:
-                    await client.query(prompt, session_unique_id)
+                    await client.query(prompt, sdk_call_session_id)
                     async for response in await client.receive_response():
                         ai_chunks.append(response)
                         yield response
                 finally:
-                    await pool.release_client(session_unique_id)
+                    await pool.release_client(sdk_call_session_id)
             else:
                 async with ClaudeClient(effective_config) as client:
-                    await client.query(prompt, session_unique_id)
+                    await client.query(prompt, sdk_call_session_id)
                     async for response in await client.receive_response():
                         ai_chunks.append(response)
                         yield response
+
+            # Extract SDK's session_id from response chunks
+            extracted_sdk_session_id = self._extract_sdk_session_id(ai_chunks)
+            if extracted_sdk_session_id and sdk_session_id is not None:
+                sdk_session_id.append(extracted_sdk_session_id)
+                logger.info(f"SDK session_id extracted and stored: {extracted_sdk_session_id}")
 
             ai_msg_id = f"assistant-{generate_uuidv7()}"
             ai_response_text = self._extract_response_text(ai_chunks)
@@ -441,3 +480,38 @@ class MessageService:
 
         logger.debug(f"delete_message completed")
         return True
+    
+    async def update_messages_session_id(
+        self,
+        old_session_id: str,
+        new_session_id: str,
+        test: bool = False
+    ) -> int:
+        """Update session_unique_id for all messages with old_session_id.
+        
+        Used when a new session is created: messages are initially created with
+        a temporary session ID, then updated to the SDK's real session_id.
+
+        Args:
+            old_session_id: The temporary session ID to replace.
+            new_session_id: The SDK's session ID to use.
+            test: Filter by test flag (default: False).
+
+        Returns:
+            Number of messages updated.
+        """
+        logger.debug(f"update_messages_session_id called: {old_session_id} -> {new_session_id}, test={test}")
+        
+        from sqlalchemy import update
+        from database.models import Message
+        
+        result = await self.session.execute(
+            update(Message)
+            .where(Message.session_unique_id == old_session_id, Message.test == test)
+            .values(session_unique_id=new_session_id, gmt_modified=get_timestamp_ms())
+        )
+        await self.session.commit()
+        
+        updated_count = result.rowcount
+        logger.info(f"Updated {updated_count} messages from temp session {old_session_id} to {new_session_id}")
+        return updated_count

@@ -487,3 +487,132 @@ async def test_send_ai_prompt_with_project_only(db_session: AsyncSession, setup_
     await db_session.refresh(setup_test_data["project"])
     
     assert setup_test_data["project"].latest_active_time is not None
+
+
+class TestExtractSDKSessionId:
+    """Tests for _extract_sdk_session_id method."""
+    
+    def test_extract_from_result_message(self, db_session: AsyncSession):
+        """Test extracting session_id from ResultMessage."""
+        service = MessageService(db_session)
+        
+        class MockResultMessage:
+            session_id = "sdk-session-123"
+            content = "AI response"
+        
+        chunks = [MockResultMessage()]
+        result = service._extract_sdk_session_id(chunks)
+        
+        assert result == "sdk-session-123"
+    
+    def test_extract_from_stream_event(self, db_session: AsyncSession):
+        """Test extracting session_id from StreamEvent."""
+        service = MessageService(db_session)
+        
+        class MockStreamEvent:
+            session_id = "sdk-session-456"
+            event = "stream"
+        
+        chunks = [MockStreamEvent()]
+        result = service._extract_sdk_session_id(chunks)
+        
+        assert result == "sdk-session-456"
+    
+    def test_extract_from_mixed_chunks(self, db_session: AsyncSession):
+        """Test extracting session_id from mixed chunks."""
+        service = MessageService(db_session)
+        
+        class MockTextChunk:
+            text = "Hello"
+        
+        class MockResultMessage:
+            session_id = "sdk-session-789"
+        
+        chunks = [MockTextChunk(), MockResultMessage()]
+        result = service._extract_sdk_session_id(chunks)
+        
+        assert result == "sdk-session-789"
+    
+    def test_extract_returns_none_when_no_session_id(self, db_session: AsyncSession):
+        """Test returns None when no chunk has session_id."""
+        service = MessageService(db_session)
+        
+        class MockTextChunk:
+            text = "Hello"
+        
+        chunks = [MockTextChunk()]
+        result = service._extract_sdk_session_id(chunks)
+        
+        assert result is None
+    
+    def test_extract_returns_first_session_id(self, db_session: AsyncSession):
+        """Test returns first session_id found."""
+        service = MessageService(db_session)
+        
+        class MockResult1:
+            session_id = "sdk-session-first"
+        
+        class MockResult2:
+            session_id = "sdk-session-second"
+        
+        chunks = [MockResult1(), MockResult2()]
+        result = service._extract_sdk_session_id(chunks)
+        
+        assert result == "sdk-session-first"
+
+
+class TestUpdateMessagesSessionId:
+    """Tests for update_messages_session_id method."""
+    
+    @pytest.mark.asyncio
+    async def test_update_messages_session_id(self, db_session: AsyncSession, setup_test_data):
+        """Test updating session_id for messages."""
+        service = MessageService(db_session)
+        
+        message1 = Message(
+            message_unique_id="msg-temp-001",
+            session_unique_id="temp-session-001",
+            gmt_create=get_timestamp_ms(),
+            gmt_modified=get_timestamp_ms(),
+            data='{"role": "user", "content": "test"}',
+            test=True
+        )
+        db_session.add(message1)
+        
+        message2 = Message(
+            message_unique_id="msg-temp-002",
+            session_unique_id="temp-session-001",
+            gmt_create=get_timestamp_ms(),
+            gmt_modified=get_timestamp_ms(),
+            data='{"role": "assistant", "content": "response"}',
+            test=True
+        )
+        db_session.add(message2)
+        await db_session.commit()
+        
+        count = await service.update_messages_session_id(
+            old_session_id="temp-session-001",
+            new_session_id="sdk-session-real-001",
+            test=True
+        )
+        
+        assert count == 2
+        
+        updated_msg1 = await service.get_message_by_unique_id("msg-temp-001", test=True)
+        updated_msg2 = await service.get_message_by_unique_id("msg-temp-002", test=True)
+        
+        assert updated_msg1.session_unique_id == "sdk-session-real-001"
+        assert updated_msg2.session_unique_id == "sdk-session-real-001"
+    
+    @pytest.mark.asyncio
+    async def test_update_messages_no_match(self, db_session: AsyncSession, setup_test_data):
+        """Test returns 0 when no messages match."""
+        service = MessageService(db_session)
+        
+        count = await service.update_messages_session_id(
+            old_session_id="non-existent-session",
+            new_session_id="sdk-session-new",
+            test=True
+        )
+        
+        assert count == 0
