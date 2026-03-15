@@ -10,6 +10,8 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
+from alembic.config import Config
+from alembic.command import upgrade
 
 logger = get_logger(__name__)
 
@@ -36,9 +38,18 @@ async def _enable_wal_mode() -> None:
             logger.debug("WAL mode already enabled")
 
 
+def _run_migrations() -> None:
+    """Run Alembic migrations to head."""
+    logger.info("Running database migrations...")
+    alembic_cfg = Config("alembic.ini")
+    upgrade(alembic_cfg, "head")
+    logger.info("Database migrations completed")
+
+
 async def init_db() -> None:
     """Initialize database with default configuration."""
     logger.info("Initializing database...")
+    _run_migrations()
     await _enable_wal_mode()
     logger.info("Database initialized successfully")
 
