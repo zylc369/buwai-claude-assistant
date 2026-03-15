@@ -388,3 +388,252 @@ class TestSendAIPrompt:
             assert '"chunk"' in content
             lines = [l for l in content.split('\n') if l.startswith('data:')]
             assert len(lines) >= 4
+
+
+class TestSendAIPromptV2:
+    """Tests for the /messages/send-v2 endpoint."""
+    
+    @pytest.mark.asyncio
+    async def test_send_v2_new_session_success(
+        self,
+        client: AsyncClient,
+        db_session: AsyncSession,
+        setup_test_data
+    ):
+        """Test creating a new session and returning session_unique_id."""
+        async def mock_send_ai_prompt(*args, **kwargs):
+            yield "Hello"
+            yield " "
+            yield "World"
+        
+        with patch('services.message_service.MessageService.send_ai_prompt') as mock_send:
+            mock_send.return_value = mock_send_ai_prompt()
+            
+            response = await client.post(
+                "/messages/send-v2",
+                json={
+                    "prompt": "Test prompt for new session",
+                    "session_unique_id": None,
+                    "external_session_id": "ext-sess-new-001",
+                    "project_unique_id": "proj_msg_001",
+                    "workspace_unique_id": "ws_msg_001",
+                    "directory": "test-path",
+                    "cwd": "/tmp",
+                    "settings": "/tmp/test_settings.json",
+                    "system_prompt": "You are a test assistant"
+                }
+            )
+            
+            assert response.status_code == 200
+            assert response.headers["content-type"] == "text/event-stream; charset=utf-8"
+            
+            content = response.text
+            
+            assert "data:" in content
+            assert '"type"' in content
+            assert '"chunk"' in content
+            assert '"done"' in content
+            assert '"session_unique_id"' in content
+            
+            lines = [l for l in content.split('\n') if l.startswith('data:')]
+            done_line = next((l for l in lines if '"done"' in l), None)
+            assert done_line is not None
+            done_data = json.loads(done_line.replace('data: ', ''))
+            assert 'session_unique_id' in done_data
+            assert done_data['session_unique_id'] is not None
+    
+    @pytest.mark.asyncio
+    async def test_send_v2_existing_session_success(
+        self,
+        client: AsyncClient,
+        db_session: AsyncSession,
+        setup_test_data
+    ):
+        """Test using an existing session."""
+        async def mock_send_ai_prompt(*args, **kwargs):
+            yield "Response"
+            yield " "
+            yield "content"
+        
+        with patch('services.message_service.MessageService.send_ai_prompt') as mock_send:
+            mock_send.return_value = mock_send_ai_prompt()
+            
+            response = await client.post(
+                "/messages/send-v2",
+                json={
+                    "prompt": "Test prompt for existing session",
+                    "session_unique_id": "sess_msg_001",
+                    "external_session_id": "external-sess-msg-001",
+                    "project_unique_id": "proj_msg_001",
+                    "workspace_unique_id": "ws_msg_001",
+                    "directory": "test-path",
+                    "cwd": "/tmp",
+                    "settings": "/tmp/test_settings.json",
+                    "system_prompt": "You are a test assistant"
+                }
+            )
+            
+            assert response.status_code == 200
+            assert response.headers["content-type"] == "text/event-stream; charset=utf-8"
+            
+            content = response.text
+            
+            assert "data:" in content
+            assert '"type"' in content
+            assert '"done"' in content
+            
+            lines = [l for l in content.split('\n') if l.startswith('data:')]
+            done_line = next((l for l in lines if '"done"' in l), None)
+            assert done_line is not None
+            done_data = json.loads(done_line.replace('data: ', ''))
+            assert done_data['session_unique_id'] == "sess_msg_001"
+    
+    @pytest.mark.asyncio
+    async def test_send_v2_invalid_workspace(
+        self,
+        client: AsyncClient,
+        db_session: AsyncSession
+    ):
+        """Test returns 400 if workspace doesn't exist."""
+        async def mock_send_ai_prompt(*args, **kwargs):
+            yield "Should not be called"
+        
+        with patch('services.message_service.MessageService.send_ai_prompt') as mock_send:
+            mock_send.return_value = mock_send_ai_prompt()
+            
+            response = await client.post(
+                "/messages/send-v2",
+                json={
+                    "prompt": "Test prompt",
+                    "session_unique_id": None,
+                    "external_session_id": "ext-sess-ws-001",
+                    "project_unique_id": "proj_msg_001",
+                    "workspace_unique_id": "non_existent_workspace",
+                    "directory": "test-path",
+                    "cwd": "/tmp",
+                    "settings": "/tmp/test_settings.json",
+                    "system_prompt": "You are a test assistant"
+                }
+            )
+            
+            assert response.status_code == 400
+            data = response.json()
+            assert "Workspace not found" in data["detail"]
+    
+    @pytest.mark.asyncio
+    async def test_send_v2_duplicate_external_id(
+        self,
+        client: AsyncClient,
+        db_session: AsyncSession,
+        setup_test_data
+    ):
+        """Test returns 400 if external_session_id already exists."""
+        async def mock_send_ai_prompt(*args, **kwargs):
+            yield "Should not be called"
+        
+        with patch('services.message_service.MessageService.send_ai_prompt') as mock_send:
+            mock_send.return_value = mock_send_ai_prompt()
+            
+            response = await client.post(
+                "/messages/send-v2",
+                json={
+                    "prompt": "Test prompt with duplicate external id",
+                    "session_unique_id": None,
+                    "external_session_id": "external-sess-msg-001",
+                    "project_unique_id": "proj_msg_001",
+                    "workspace_unique_id": "ws_msg_001",
+                    "directory": "test-path",
+                    "cwd": "/tmp",
+                    "settings": "/tmp/test_settings.json",
+                    "system_prompt": "You are a test assistant"
+                }
+            )
+            
+            assert response.status_code == 400
+            data = response.json()
+            assert "already exists" in data["detail"]
+    
+    @pytest.mark.asyncio
+    async def test_send_v2_sse_streaming(
+        self,
+        client: AsyncClient,
+        db_session: AsyncSession,
+        setup_test_data
+    ):
+        """Test verifies SSE response format with session_unique_id in done event."""
+        async def mock_send_ai_prompt(*args, **kwargs):
+            yield {"text": "chunk1"}
+            yield "plain_string"
+            yield {"content": "final chunk"}
+        
+        with patch('services.message_service.MessageService.send_ai_prompt') as mock_send:
+            mock_send.return_value = mock_send_ai_prompt()
+            
+            response = await client.post(
+                "/messages/send-v2",
+                json={
+                    "prompt": "Test SSE streaming",
+                    "session_unique_id": "sess_msg_001",
+                    "external_session_id": "external-sess-msg-001",
+                    "project_unique_id": "proj_msg_001",
+                    "workspace_unique_id": "ws_msg_001",
+                    "directory": "test-path",
+                    "cwd": "/tmp",
+                    "settings": "/tmp/test.json"
+                }
+            )
+            
+            assert response.status_code == 200
+            content = response.text
+            
+            assert "data:" in content
+            assert '"type"' in content
+            
+            lines = [l for l in content.split('\n') if l.strip() and l.startswith('data:')]
+            assert len(lines) >= 2
+            
+            chunk_lines = [l for l in lines if '"chunk"' in l]
+            assert len(chunk_lines) >= 3
+            
+            done_lines = [l for l in lines if '"done"' in l]
+            assert len(done_lines) == 1
+            
+            done_data = json.loads(done_lines[0].replace('data: ', ''))
+            assert done_data["type"] == "done"
+            assert "session_unique_id" in done_data
+            assert done_data["session_unique_id"] == "sess_msg_001"
+            
+            error_lines = [l for l in lines if '"error"' in l]
+            assert len(error_lines) == 0
+    
+    @pytest.mark.asyncio
+    async def test_send_v2_nonexistent_session_returns_404(
+        self,
+        client: AsyncClient,
+        db_session: AsyncSession
+    ):
+        """Test returns 404 if session_unique_id is provided but session doesn't exist."""
+        async def mock_send_ai_prompt(*args, **kwargs):
+            yield "Should not be called"
+        
+        with patch('services.message_service.MessageService.send_ai_prompt') as mock_send:
+            mock_send.return_value = mock_send_ai_prompt()
+            
+            response = await client.post(
+                "/messages/send-v2",
+                json={
+                    "prompt": "Test prompt",
+                    "session_unique_id": "non_existent_session_id",
+                    "external_session_id": "ext-sess-404",
+                    "project_unique_id": "proj_msg_001",
+                    "workspace_unique_id": "ws_msg_001",
+                    "directory": "test-path",
+                    "cwd": "/tmp",
+                    "settings": "/tmp/test_settings.json",
+                    "system_prompt": "You are a test assistant"
+                }
+            )
+            
+            assert response.status_code == 404
+            data = response.json()
+            assert "Session not found" in data["detail"]

@@ -477,3 +477,97 @@ class TestWorkspaceServiceSearch:
 
         assert len(results) == 1
         assert results[0].directory == "test-workspace"
+
+
+class TestValidateWorkspaceExists:
+    """Tests for validate_workspace_exists method."""
+
+    @pytest.mark.asyncio
+    async def test_validate_workspace_exists_success(
+        self, db_session: AsyncSession, sample_project: Project
+    ):
+        """Test validation succeeds when workspace found and directory matches."""
+        service = WorkspaceService(db_session)
+
+        workspace = await service.create_workspace(
+            workspace_unique_id="ws-001",
+            project_unique_id="proj-001",
+            directory="test-workspace",
+            test=True
+        )
+
+        result = await service.validate_workspace_exists(
+            workspace_unique_id="ws-001",
+            expected_directory="test-workspace",
+            test=True
+        )
+
+        assert result is not None
+        assert result.workspace_unique_id == "ws-001"
+        assert result.directory == "test-workspace"
+        assert result.id == workspace.id
+
+    @pytest.mark.asyncio
+    async def test_validate_workspace_not_found(self, db_session: AsyncSession):
+        """Test that workspace not found raises ValueError."""
+        service = WorkspaceService(db_session)
+
+        with pytest.raises(ValueError) as exc_info:
+            await service.validate_workspace_exists(
+                workspace_unique_id="non-existent-ws",
+                expected_directory="some-directory",
+                test=True
+            )
+
+        assert "Workspace not found: non-existent-ws" in str(exc_info.value)
+
+    @pytest.mark.asyncio
+    async def test_validate_workspace_directory_mismatch(
+        self, db_session: AsyncSession, sample_project: Project
+    ):
+        """Test that directory mismatch raises ValueError."""
+        service = WorkspaceService(db_session)
+
+        await service.create_workspace(
+            workspace_unique_id="ws-001",
+            project_unique_id="proj-001",
+            directory="actual-directory",
+            test=True
+        )
+
+        with pytest.raises(ValueError) as exc_info:
+            await service.validate_workspace_exists(
+                workspace_unique_id="ws-001",
+                expected_directory="wrong-directory",
+                test=True
+            )
+
+        error_message = str(exc_info.value)
+        assert "Workspace directory mismatch" in error_message
+        assert "expected 'wrong-directory'" in error_message
+        assert "actual 'actual-directory'" in error_message
+
+    @pytest.mark.asyncio
+    async def test_validate_workspace_with_test_flag(
+        self, db_session: AsyncSession, sample_project: Project
+    ):
+        """Test that validation works correctly with test=True flag."""
+        service = WorkspaceService(db_session)
+
+        await service.create_workspace(
+            workspace_unique_id="ws-001",
+            project_unique_id="proj-001",
+            directory="test-workspace",
+            test=True
+        )
+
+        result = await service.validate_workspace_exists(
+            workspace_unique_id="ws-001",
+            expected_directory="test-workspace",
+            test=True
+        )
+
+        assert result is not None
+        assert result.test is True
+        assert result.workspace_unique_id == "ws-001"
+        assert result.directory == "test-workspace"

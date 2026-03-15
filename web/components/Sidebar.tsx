@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog } from "@base-ui/react";
 import { Plus, MessageSquare, FolderOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,15 @@ export function Sidebar() {
   const createWorkspace = useCreateWorkspace();
 
   const sortedSessions = [...sessions].sort((a, b) => b.gmt_create - a.gmt_create);
+
+  // Auto-select last session when workspace switches (需求 3.3)
+  useEffect(() => {
+    if (selectedWorkspace && sortedSessions.length > 0 && !isNewSession) {
+      if (!selectedSession || selectedSession.workspace_unique_id !== selectedWorkspace.workspace_unique_id) {
+        setSelectedSession(sortedSessions[0]);
+      }
+    }
+  }, [selectedWorkspace, sortedSessions, isNewSession, setSelectedSession, selectedSession]);
 
   const handleCreateWorkspace = async () => {
     if (!newWorkspaceName.trim() || !newWorkspaceDirectory.trim() || !selectedProject) return;
