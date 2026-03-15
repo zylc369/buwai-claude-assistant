@@ -46,6 +46,7 @@ export function Sidebar() {
   // Auto-select last session when workspace switches (需求 3.3)
   // Clear stale session when switching to workspace with no sessions
   // Clear session when workspace becomes null
+  // Create new session when workspace has no sessions (需求 3.4)
   useEffect(() => {
     if (selectedWorkspace) {
       if (sortedSessions.length > 0 && !isNewSession) {
@@ -54,11 +55,13 @@ export function Sidebar() {
         }
       } else if (sortedSessions.length === 0 && selectedSession && selectedSession.workspace_unique_id !== selectedWorkspace.workspace_unique_id) {
         clearSession();
+      } else if (sortedSessions.length === 0 && !isNewSession) {
+        createNewSession(selectedProject!, selectedWorkspace);
       }
     } else if (selectedSession) {
       clearSession();
     }
-  }, [selectedWorkspace, sortedSessions, isNewSession, setSelectedSession, selectedSession, clearSession]);
+  }, [selectedWorkspace, sortedSessions, isNewSession, setSelectedSession, selectedSession, clearSession, selectedProject, createNewSession]);
 
   const handleCreateWorkspace = async () => {
     if (!newWorkspaceName.trim() || !newWorkspaceDirectory.trim() || !selectedProject) return;
